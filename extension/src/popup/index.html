@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>inSpace</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <!-- Auth screen -->
+    <div id="auth-view" class="view" style="display: none">
+      <div class="logo">inSpace</div>
+      <p class="subtitle">Smart bookmarks, everywhere.</p>
+      <button id="btn-google-signin" class="btn btn-primary btn-full">
+        Sign in with Google
+      </button>
+      <div class="divider"><span>or</span></div>
+      <input id="input-email" type="email" placeholder="Email" class="input" />
+      <input
+        id="input-password"
+        type="password"
+        placeholder="Password"
+        class="input"
+      />
+      <button id="btn-email-signin" class="btn btn-secondary btn-full">
+        Sign in
+      </button>
+      <p id="auth-error" class="error"></p>
+    </div>
+
+    <!-- Save screen -->
+    <div id="save-view" class="view" style="display: none">
+      <div class="header">
+        <div class="logo-sm">inSpace</div>
+        <button id="btn-signout" class="btn-icon" title="Sign out">↗</button>
+      </div>
+
+      <div id="screenshot-preview" class="screenshot-preview">
+        <img id="screenshot-img" src="" alt="" />
+      </div>
+
+      <input
+        id="input-title"
+        type="text"
+        placeholder="Page title"
+        class="input"
+      />
+
+      <div class="url-row">
+        <img id="favicon" class="favicon" src="" alt="" />
+        <span id="display-url" class="url-text"></span>
+      </div>
+
+      <div id="tags-preview" class="tags-preview"></div>
+
+      <textarea
+        id="input-note"
+        placeholder="Add a note (optional)"
+        class="input textarea"
+        rows="2"
+      ></textarea>
+
+      <div class="toggle-row">
+        <label class="toggle-label" for="toggle-screenshot">
+          Capture screenshot
+        </label>
+        <input
+          id="toggle-screenshot"
+          type="checkbox"
+          class="toggle"
+          checked
+        />
+      </div>
+
+      <button id="btn-save" class="btn btn-primary btn-full">Save</button>
+      <div id="save-status" class="status"></div>
+    </div>
+
+    <!-- Success screen -->
+    <div id="success-view" class="view" style="display: none">
+      <div class="success-icon">✓</div>
+      <p class="success-text">Saved to inSpace</p>
+      <button id="btn-open-dashboard" class="btn btn-secondary btn-full">
+        Open Dashboard
+      </button>
+    </div>
+
+    <script type="module" src="./popup.ts"></script>
+  </body>
+</html>

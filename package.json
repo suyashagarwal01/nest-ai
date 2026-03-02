@@ -1,0 +1,10 @@
+{
+  "name": "inspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Smart bookmarking with screenshots and AI tagging",
+  "scripts": {
+    "dev:extension": "cd extension && npm run dev",
+    "build:extension": "cd extension && npm run build"
+  }
+}
