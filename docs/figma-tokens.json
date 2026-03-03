@@ -1,0 +1,118 @@
+{
+  "inSpace": {
+    "color": {
+      "bg": {
+        "default": { "value": "#FFFFFF", "type": "color" },
+        "secondary": { "value": "#F5F5F5", "type": "color" },
+        "hover": { "value": "#E8E8E8", "type": "color" },
+        "page": { "value": "#F8F8F8", "type": "color" }
+      },
+      "text": {
+        "primary": { "value": "#111111", "type": "color" },
+        "secondary": { "value": "#666666", "type": "color" },
+        "tertiary": { "value": "#999999", "type": "color" },
+        "placeholder": { "value": "#AAAAAA", "type": "color" },
+        "inverse": { "value": "#FFFFFF", "type": "color" }
+      },
+      "border": {
+        "default": { "value": "#E0E0E0", "type": "color" },
+        "focus": { "value": "#111111", "type": "color" }
+      },
+      "accent": {
+        "default": { "value": "#111111", "type": "color" },
+        "text": { "value": "#FFFFFF", "type": "color" }
+      },
+      "success": {
+        "default": { "value": "#22C55E", "type": "color" },
+        "light": { "value": "#F0FDF4", "type": "color" }
+      },
+      "error": {
+        "default": { "value": "#EF4444", "type": "color" }
+      },
+      "warning": {
+        "bg": { "value": "#FFF7ED", "type": "color" },
+        "border": { "value": "#FED7AA", "type": "color" },
+        "text": { "value": "#9A3412", "type": "color" }
+      },
+      "tag": {
+        "bg": { "value": "#F0F0F0", "type": "color" },
+        "text": { "value": "#444444", "type": "color" }
+      }
+    },
+    "borderRadius": {
+      "sm": { "value": "4", "type": "borderRadius" },
+      "md": { "value": "8", "type": "borderRadius" },
+      "lg": { "value": "12", "type": "borderRadius" },
+      "full": { "value": "9999", "type": "borderRadius" }
+    },
+    "spacing": {
+      "popup-padding": { "value": "16", "type": "spacing" },
+      "gap-default": { "value": "12", "type": "spacing" },
+      "gap-tags": { "value": "6", "type": "spacing" },
+      "gap-inline": { "value": "8", "type": "spacing" },
+      "input-padding-x": { "value": "12", "type": "spacing" },
+      "input-padding-y": { "value": "10", "type": "spacing" },
+      "button-padding-x": { "value": "16", "type": "spacing" },
+      "button-padding-y": { "value": "10", "type": "spacing" },
+      "tag-padding-x": { "value": "10", "type": "spacing" },
+      "tag-padding-y": { "value": "3", "type": "spacing" }
+    },
+    "fontFamily": {
+      "sans": { "value": "SF Pro Text, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif", "type": "fontFamilies" }
+    },
+    "fontSize": {
+      "logo": { "value": "24", "type": "fontSizes" },
+      "logo-sm": { "value": "16", "type": "fontSizes" },
+      "title": { "value": "16", "type": "fontSizes" },
+      "body": { "value": "14", "type": "fontSizes" },
+      "label": { "value": "13", "type": "fontSizes" },
+      "caption": { "value": "12", "type": "fontSizes" },
+      "overline": { "value": "11", "type": "fontSizes" }
+    },
+    "fontWeight": {
+      "regular": { "value": "400", "type": "fontWeights" },
+      "medium": { "value": "500", "type": "fontWeights" },
+      "semibold": { "value": "600", "type": "fontWeights" },
+      "bold": { "value": "700", "type": "fontWeights" }
+    },
+    "letterSpacing": {
+      "tight": { "value": "-0.5", "type": "letterSpacing" },
+      "slightly-tight": { "value": "-0.3", "type": "letterSpacing" },
+      "normal": { "value": "0", "type": "letterSpacing" },
+      "wide": { "value": "0.5", "type": "letterSpacing" }
+    },
+    "boxShadow": {
+      "card": {
+        "value": {
+          "x": 0,
+          "y": 1,
+          "blur": 3,
+          "spread": 0,
+          "color": "rgba(0,0,0,0.08)",
+          "type": "dropShadow"
+        },
+        "type": "boxShadow"
+      },
+      "toggle-knob": {
+        "value": {
+          "x": 0,
+          "y": 1,
+          "blur": 2,
+          "spread": 0,
+          "color": "rgba(0,0,0,0.15)",
+          "type": "dropShadow"
+        },
+        "type": "boxShadow"
+      }
+    },
+    "sizing": {
+      "popup-width": { "value": "360", "type": "sizing" },
+      "screenshot-height": { "value": "140", "type": "sizing" },
+      "success-icon": { "value": "48", "type": "sizing" },
+      "favicon": { "value": "16", "type": "sizing" },
+      "toggle-width": { "value": "36", "type": "sizing" },
+      "toggle-height": { "value": "20", "type": "sizing" },
+      "toggle-knob": { "value": "16", "type": "sizing" }
+    }
+  }
+}

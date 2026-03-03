@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { ExternalLink, Pencil, Trash2, X, Check } from "lucide-react";
+import { Pencil, Trash2, X, Check } from "lucide-react";
 import type { Bookmark, Tag } from "@/lib/types";
 import { createSupabaseBrowser } from "@/lib/supabase-browser";
 

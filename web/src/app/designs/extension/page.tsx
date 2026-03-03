@@ -87,7 +87,7 @@ function ExtensionFrame({ children, label }: { children: React.ReactNode; label:
   );
 }
 
-function InputField({ placeholder, type = "text", value }: { placeholder: string; type?: string; value?: string }) {
+function InputField({ placeholder, value }: { placeholder: string; type?: string; value?: string }) {
   return (
     <div style={{
       width: "100%",

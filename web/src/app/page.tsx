@@ -40,10 +40,12 @@ export default function DashboardPage() {
   }, [supabase]);
 
   useEffect(() => {
-    fetchBookmarks();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    const init = async () => {
+      await fetchBookmarks();
+      const { data: { user } } = await supabase.auth.getUser();
       setUserEmail(user?.email ?? undefined);
-    });
+    };
+    init();
   }, [fetchBookmarks, supabase.auth]);
 
   // Derived data
