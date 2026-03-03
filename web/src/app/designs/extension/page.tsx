@@ -4,6 +4,8 @@
  * Extension UI — all states rendered at 360px for Figma capture.
  * Uses consistent design tokens (CSS variables) so Figma picks up
  * reusable styles. Everything uses flexbox for auto-layout conversion.
+ *
+ * Updated: Google-only auth, account bar, "Save another" in success.
  */
 
 /* ── Inline SVGs ─────────────────────────────────────────── */
@@ -23,15 +25,6 @@ function CheckIcon({ size = 14 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-function SignOutIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 17l-4-4 4-4" /><line x1="3" y1="13" x2="15" y2="13" />
-      <path d="M10 3h7a2 2 0 012 2v14a2 2 0 01-2 2h-7" />
     </svg>
   );
 }
@@ -105,7 +98,7 @@ function InputField({ placeholder, value }: { placeholder: string; type?: string
   );
 }
 
-function PrimaryButton({ children, fullWidth = true }: { children: React.ReactNode; fullWidth?: boolean }) {
+function PrimaryButton({ children, fullWidth = true, disabled = false }: { children: React.ReactNode; fullWidth?: boolean; disabled?: boolean }) {
   return (
     <div style={{
       display: "flex",
@@ -121,13 +114,14 @@ function PrimaryButton({ children, fullWidth = true }: { children: React.ReactNo
       width: fullWidth ? "100%" : "auto",
       boxSizing: "border-box" as const,
       cursor: "pointer",
+      opacity: disabled ? 0.5 : 1,
     }}>
       {children}
     </div>
   );
 }
 
-function SecondaryButton({ children, fullWidth = true, icon }: { children: React.ReactNode; fullWidth?: boolean; icon?: React.ReactNode }) {
+function SecondaryButton({ children, fullWidth = true }: { children: React.ReactNode; fullWidth?: boolean }) {
   return (
     <div style={{
       display: "flex",
@@ -145,7 +139,6 @@ function SecondaryButton({ children, fullWidth = true, icon }: { children: React
       boxSizing: "border-box" as const,
       cursor: "pointer",
     }}>
-      {icon}
       {children}
     </div>
   );
@@ -157,7 +150,7 @@ function GoogleButton() {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      gap: 8,
+      gap: 10,
       padding: "10px 16px",
       background: tokens.bg,
       border: `1px solid ${tokens.border}`,
@@ -175,12 +168,41 @@ function GoogleButton() {
   );
 }
 
-function Divider() {
+function AccountBar({ name, avatarBg }: { name: string; avatarBg: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
-      <div style={{ flex: 1, height: 1, background: tokens.border }} />
-      <span style={{ fontSize: 12, color: tokens.textTertiary, fontFamily: tokens.fontFamily }}>or</span>
-      <div style={{ flex: 1, height: 1, background: tokens.border }} />
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <div style={{
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          background: avatarBg,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 11,
+          fontWeight: 600,
+          color: tokens.accentText,
+          fontFamily: tokens.fontFamily,
+        }}>
+          {name.charAt(0).toUpperCase()}
+        </div>
+        <span style={{
+          fontSize: 13,
+          fontWeight: 500,
+          color: "#333",
+          fontFamily: tokens.fontFamily,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap" as const,
+        }}>
+          {name}
+        </span>
+      </div>
+      <span style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: tokens.fontFamily, cursor: "pointer" }}>
+        Sign out
+      </span>
     </div>
   );
 }
@@ -225,12 +247,22 @@ function Toggle({ checked }: { checked: boolean }) {
   );
 }
 
-/* ── State 1: Auth ──────────────────────────────────────── */
+function FooterLink({ label }: { label: string }) {
+  return (
+    <div style={{ textAlign: "center" as const, paddingTop: 4 }}>
+      <span style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: tokens.fontFamily, cursor: "pointer" }}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/* ── State 1: Auth (Google only) ───────────────────────── */
 
 function AuthState() {
   return (
     <ExtensionFrame label="Auth — Sign In">
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: 16 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
         <div style={{ fontSize: 24, fontWeight: 700, color: tokens.text, fontFamily: tokens.fontFamily, letterSpacing: -0.5 }}>
           inSpace
         </div>
@@ -238,10 +270,6 @@ function AuthState() {
           Smart bookmarks, everywhere.
         </div>
         <GoogleButton />
-        <Divider />
-        <InputField placeholder="Email" type="email" />
-        <InputField placeholder="Password" type="password" />
-        <SecondaryButton>Sign in</SecondaryButton>
       </div>
     </ExtensionFrame>
   );
@@ -252,7 +280,7 @@ function AuthState() {
 function AuthErrorState() {
   return (
     <ExtensionFrame label="Auth — Error">
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: 16 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
         <div style={{ fontSize: 24, fontWeight: 700, color: tokens.text, fontFamily: tokens.fontFamily, letterSpacing: -0.5 }}>
           inSpace
         </div>
@@ -260,33 +288,21 @@ function AuthErrorState() {
           Smart bookmarks, everywhere.
         </div>
         <GoogleButton />
-        <Divider />
-        <InputField placeholder="Email" type="email" value="user@example.com" />
-        <InputField placeholder="Password" type="password" value="••••••••" />
-        <SecondaryButton>Sign in</SecondaryButton>
         <div style={{ fontSize: 12, color: tokens.error, fontFamily: tokens.fontFamily, textAlign: "center" as const }}>
-          Invalid login credentials
+          Sign-in was cancelled.
         </div>
       </div>
     </ExtensionFrame>
   );
 }
 
-/* ── State 2: Save (with screenshot) ────────────────────── */
+/* ── State 2: Save (with screenshot + account bar) ──────── */
 
 function SaveState() {
   return (
     <ExtensionFrame label="Save — With Screenshot">
       <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: tokens.text, fontFamily: tokens.fontFamily, letterSpacing: -0.3 }}>
-            inSpace
-          </div>
-          <div style={{ padding: 4, color: tokens.textSecondary, cursor: "pointer" }}>
-            <SignOutIcon />
-          </div>
-        </div>
+        <AccountBar name="Suyash Agarwal" avatarBg="#4285F4" />
 
         {/* Screenshot preview */}
         <div style={{
@@ -304,10 +320,8 @@ function SaveState() {
           </div>
         </div>
 
-        {/* Title input */}
         <InputField placeholder="Page title" value="vercel/next.js: The React Framework" />
 
-        {/* URL row */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0" }}>
           <div style={{ width: 16, height: 16, borderRadius: 2, background: "#24292e", flexShrink: 0 }} />
           <span style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: tokens.fontFamily, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
@@ -315,7 +329,6 @@ function SaveState() {
           </span>
         </div>
 
-        {/* Tags */}
         <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
           <TagPill label="development" />
           <TagPill label="react" />
@@ -323,16 +336,15 @@ function SaveState() {
           <TagPill label="vercel" />
         </div>
 
-        {/* Note input */}
         <InputField placeholder="Add a note (optional)" />
 
-        {/* Screenshot toggle */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
           <span style={{ fontSize: 13, color: tokens.tagText, fontFamily: tokens.fontFamily }}>Capture screenshot</span>
           <Toggle checked={true} />
         </div>
 
         <PrimaryButton>Save</PrimaryButton>
+        <FooterLink label="View Dashboard" />
       </div>
     </ExtensionFrame>
   );
@@ -344,20 +356,10 @@ function SaveNoScreenshotState() {
   return (
     <ExtensionFrame label="Save — No Screenshot">
       <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: tokens.text, fontFamily: tokens.fontFamily, letterSpacing: -0.3 }}>
-            inSpace
-          </div>
-          <div style={{ padding: 4, color: tokens.textSecondary, cursor: "pointer" }}>
-            <SignOutIcon />
-          </div>
-        </div>
+        <AccountBar name="Suyash Agarwal" avatarBg="#4285F4" />
 
-        {/* Title input */}
         <InputField placeholder="Page title" value="Attention Is All You Need — arXiv" />
 
-        {/* URL row */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0" }}>
           <div style={{ width: 16, height: 16, borderRadius: 2, background: "#b31b1b", flexShrink: 0 }} />
           <span style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: tokens.fontFamily, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
@@ -365,23 +367,21 @@ function SaveNoScreenshotState() {
           </span>
         </div>
 
-        {/* Tags */}
         <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
           <TagPill label="research" />
           <TagPill label="ai" />
           <TagPill label="machine-learning" />
         </div>
 
-        {/* Note input */}
         <InputField placeholder="Add a note (optional)" value="Foundational transformer paper" />
 
-        {/* Screenshot toggle */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
           <span style={{ fontSize: 13, color: tokens.tagText, fontFamily: tokens.fontFamily }}>Capture screenshot</span>
           <Toggle checked={false} />
         </div>
 
         <PrimaryButton>Save</PrimaryButton>
+        <FooterLink label="View Dashboard" />
       </div>
     </ExtensionFrame>
   );
@@ -393,17 +393,8 @@ function SavingState() {
   return (
     <ExtensionFrame label="Save — Loading">
       <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: tokens.text, fontFamily: tokens.fontFamily, letterSpacing: -0.3 }}>
-            inSpace
-          </div>
-          <div style={{ padding: 4, color: tokens.textSecondary }}>
-            <SignOutIcon />
-          </div>
-        </div>
+        <AccountBar name="Suyash Agarwal" avatarBg="#4285F4" />
 
-        {/* Screenshot preview */}
         <div style={{
           width: "100%",
           height: 140,
@@ -441,24 +432,7 @@ function SavingState() {
           <Toggle checked={true} />
         </div>
 
-        {/* Disabled save button */}
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "10px 16px",
-          background: tokens.accent,
-          color: tokens.accentText,
-          borderRadius: tokens.radiusMd,
-          fontSize: 14,
-          fontWeight: 600,
-          fontFamily: tokens.fontFamily,
-          width: "100%",
-          boxSizing: "border-box" as const,
-          opacity: 0.5,
-        }}>
-          Save
-        </div>
+        <PrimaryButton disabled>Save</PrimaryButton>
 
         <div style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: tokens.fontFamily, textAlign: "center" as const }}>
           Saving...
@@ -473,7 +447,7 @@ function SavingState() {
 function SuccessState() {
   return (
     <ExtensionFrame label="Success">
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "32px 16px 16px" }}>
         <div style={{
           width: 48,
           height: 48,
@@ -488,10 +462,11 @@ function SuccessState() {
         }}>
           <CheckIcon size={24} />
         </div>
-        <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text, fontFamily: tokens.fontFamily }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text, fontFamily: tokens.fontFamily, marginBottom: 4 }}>
           Saved to inSpace
         </div>
-        <SecondaryButton>Open Dashboard</SecondaryButton>
+        <PrimaryButton>View Dashboard</PrimaryButton>
+        <SecondaryButton>Save another</SecondaryButton>
       </div>
     </ExtensionFrame>
   );
@@ -503,17 +478,8 @@ function DuplicateState() {
   return (
     <ExtensionFrame label="Duplicate Detected">
       <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: tokens.text, fontFamily: tokens.fontFamily, letterSpacing: -0.3 }}>
-            inSpace
-          </div>
-          <div style={{ padding: 4, color: tokens.textSecondary }}>
-            <SignOutIcon />
-          </div>
-        </div>
+        <AccountBar name="Suyash Agarwal" avatarBg="#4285F4" />
 
-        {/* Info banner */}
         <div style={{
           display: "flex",
           alignItems: "center",
@@ -552,6 +518,7 @@ function DuplicateState() {
         </div>
 
         <PrimaryButton>Update</PrimaryButton>
+        <FooterLink label="View Dashboard" />
       </div>
     </ExtensionFrame>
   );
@@ -573,7 +540,7 @@ export default function ExtensionDesignsPage() {
           inSpace — Extension UI States
         </h1>
         <p style={{ fontSize: 13, color: tokens.textTertiary }}>
-          360px popup · All states · Design tokens below
+          360px popup · Google-only auth · Account bar · All states
         </p>
       </div>
 
@@ -642,7 +609,7 @@ export default function ExtensionDesignsPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {[
               { name: "Logo", size: "24px", weight: "700", tracking: "-0.5px" },
-              { name: "Logo (sm)", size: "16px", weight: "700", tracking: "-0.3px" },
+              { name: "Account", size: "13px", weight: "500", tracking: "0" },
               { name: "Title", size: "16px", weight: "600", tracking: "0" },
               { name: "Body", size: "14px", weight: "400", tracking: "0" },
               { name: "Button", size: "14px", weight: "600", tracking: "0" },

@@ -4,51 +4,19 @@ import { createSupabaseBrowser } from "@/lib/supabase-browser";
 import { useState } from "react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
 
   const supabase = createSupabaseBrowser();
 
   async function handleGoogleSignIn() {
-    await supabase.auth.signInWithOAuth({
+    setError("");
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${location.origin}/auth/callback` },
     });
-  }
-
-  async function handleEmailSignIn(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    setMessage("");
-
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (signInError) {
-      if (signInError.message.includes("Invalid login")) {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: `${location.origin}/auth/callback` },
-        });
-        if (signUpError) {
-          setError(signUpError.message);
-        } else {
-          setMessage("Account created! Check your email to confirm.");
-        }
-      } else {
-        setError(signInError.message);
-      }
-    } else {
-      window.location.href = "/";
+    if (error) {
+      setError(error.message);
     }
-    setLoading(false);
   }
 
   return (
@@ -86,43 +54,8 @@ export default function LoginPage() {
           Continue with Google
         </button>
 
-        <div className="flex items-center gap-3 my-6">
-          <div className="flex-1 h-px bg-neutral-200" />
-          <span className="text-xs text-neutral-400">or</span>
-          <div className="flex-1 h-px bg-neutral-200" />
-        </div>
-
-        <form onSubmit={handleEmailSignIn} className="flex flex-col gap-3">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm outline-none focus:border-neutral-900 transition-colors"
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm outline-none focus:border-neutral-900 transition-colors"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full px-4 py-2.5 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
-
         {error && (
-          <p className="mt-3 text-xs text-red-500 text-center">{error}</p>
-        )}
-        {message && (
-          <p className="mt-3 text-xs text-green-600 text-center">{message}</p>
+          <p className="mt-4 text-xs text-red-500 text-center">{error}</p>
         )}
       </div>
     </div>
