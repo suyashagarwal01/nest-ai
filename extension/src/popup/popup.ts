@@ -10,12 +10,14 @@ const successView = document.getElementById("success-view") as HTMLDivElement;
 
 // Auth
 const btnGoogleSignin = document.getElementById("btn-google-signin") as HTMLButtonElement;
-const btnEmailSignin = document.getElementById("btn-email-signin") as HTMLButtonElement;
-const inputEmail = document.getElementById("input-email") as HTMLInputElement;
-const inputPassword = document.getElementById("input-password") as HTMLInputElement;
 const authError = document.getElementById("auth-error") as HTMLParagraphElement;
 
-// Save
+// Save — account bar
+const userAvatar = document.getElementById("user-avatar") as HTMLImageElement;
+const userName = document.getElementById("user-name") as HTMLSpanElement;
+const btnSignout = document.getElementById("btn-signout") as HTMLButtonElement;
+
+// Save — form
 const inputTitle = document.getElementById("input-title") as HTMLInputElement;
 const displayUrl = document.getElementById("display-url") as HTMLSpanElement;
 const favicon = document.getElementById("favicon") as HTMLImageElement;
@@ -26,10 +28,11 @@ const screenshotPreview = document.getElementById("screenshot-preview") as HTMLD
 const screenshotImg = document.getElementById("screenshot-img") as HTMLImageElement;
 const btnSave = document.getElementById("btn-save") as HTMLButtonElement;
 const saveStatus = document.getElementById("save-status") as HTMLDivElement;
-const btnSignout = document.getElementById("btn-signout") as HTMLButtonElement;
+const btnDashboardFooter = document.getElementById("btn-dashboard-footer") as HTMLButtonElement;
 
 // Success
 const btnOpenDashboard = document.getElementById("btn-open-dashboard") as HTMLButtonElement;
+const btnSaveAnother = document.getElementById("btn-save-another") as HTMLButtonElement;
 
 // ─── State ───────────────────────────────────────────────────
 
@@ -44,6 +47,26 @@ function showView(view: "auth" | "save" | "success") {
   successView.style.display = view === "success" ? "flex" : "none";
 }
 
+// ─── User Profile ────────────────────────────────────────────
+
+async function populateAccountBar(): Promise<void> {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const meta = user.user_metadata ?? {};
+  const name = meta.full_name || meta.name || user.email || "User";
+  const avatarUrl = meta.avatar_url || meta.picture || "";
+
+  userName.textContent = name;
+  if (avatarUrl) {
+    userAvatar.src = avatarUrl;
+    userAvatar.style.display = "block";
+  } else {
+    userAvatar.style.display = "none";
+  }
+}
+
 // ─── Auth ────────────────────────────────────────────────────
 
 async function checkAuth(): Promise<boolean> {
@@ -53,63 +76,79 @@ async function checkAuth(): Promise<boolean> {
 }
 
 btnGoogleSignin.addEventListener("click", async () => {
-  const supabase = getSupabase();
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      // Open in new tab since popup can't handle OAuth redirect
-      redirectTo: chrome.identity.getRedirectURL(),
-    },
-  });
-  if (error) {
-    authError.textContent = error.message;
-  }
-});
+  btnGoogleSignin.disabled = true;
+  authError.textContent = "";
 
-btnEmailSignin.addEventListener("click", async () => {
-  const email = inputEmail.value.trim();
-  const password = inputPassword.value;
-  if (!email || !password) {
-    authError.textContent = "Please enter email and password.";
-    return;
-  }
+  try {
+    const supabase = getSupabase();
+    const redirectUrl = chrome.identity.getRedirectURL();
 
-  const supabase = getSupabase();
+    // Step 1: Get the OAuth URL from Supabase (skip browser redirect)
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        skipBrowserRedirect: true,
+        redirectTo: redirectUrl,
+      },
+    });
 
-  // Try sign in first, then sign up if not found
-  const { error: signInError } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (signInError) {
-    // If invalid credentials, try signup
-    if (signInError.message.includes("Invalid login")) {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (signUpError) {
-        authError.textContent = signUpError.message;
-        return;
-      }
-      authError.textContent = "";
-      authError.style.color = "#22c55e";
-      authError.textContent = "Account created! Check your email to confirm.";
+    if (error || !data.url) {
+      authError.textContent = error?.message ?? "Failed to start sign-in.";
+      btnGoogleSignin.disabled = false;
       return;
     }
-    authError.textContent = signInError.message;
-    return;
-  }
 
-  authError.textContent = "";
-  await initSaveView();
+    // Step 2: Open Chrome's auth flow (handles the OAuth popup properly)
+    const responseUrl = await chrome.identity.launchWebAuthFlow({
+      url: data.url,
+      interactive: true,
+    });
+
+    if (!responseUrl) {
+      authError.textContent = "Sign-in was cancelled.";
+      btnGoogleSignin.disabled = false;
+      return;
+    }
+
+    // Step 3: Parse tokens from the response URL hash fragment
+    const url = new URL(responseUrl);
+    // Supabase returns tokens in the hash fragment
+    const hashParams = new URLSearchParams(url.hash.substring(1));
+    const accessToken = hashParams.get("access_token");
+    const refreshToken = hashParams.get("refresh_token");
+
+    if (!accessToken || !refreshToken) {
+      authError.textContent = "Failed to complete sign-in. Missing tokens.";
+      btnGoogleSignin.disabled = false;
+      return;
+    }
+
+    // Step 4: Set the session in Supabase client
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+
+    if (sessionError) {
+      authError.textContent = sessionError.message;
+      btnGoogleSignin.disabled = false;
+      return;
+    }
+
+    // Success — show save view
+    await initSaveView();
+  } catch (err) {
+    authError.textContent = err instanceof Error ? err.message : "Sign-in failed.";
+    btnGoogleSignin.disabled = false;
+  }
 });
 
 btnSignout.addEventListener("click", async () => {
   const supabase = getSupabase();
   await supabase.auth.signOut();
   showView("auth");
+  btnGoogleSignin.disabled = false;
+  authError.textContent = "";
 });
 
 // ─── Page Meta & Screenshot ──────────────────────────────────
@@ -148,6 +187,9 @@ async function initSaveView() {
   showView("save");
   saveStatus.textContent = "Loading page info...";
   btnSave.disabled = true;
+
+  // Populate account bar
+  await populateAccountBar();
 
   // Get page meta from content script
   currentMeta = await getPageMeta();
@@ -233,12 +275,21 @@ btnSave.addEventListener("click", async () => {
   }
 });
 
-// ─── Dashboard link ──────────────────────────────────────────
+// ─── Dashboard links ─────────────────────────────────────────
 
-btnOpenDashboard.addEventListener("click", () => {
+function openDashboard() {
   const dashboardUrl = import.meta.env.VITE_DASHBOARD_URL ?? "http://localhost:3000";
   chrome.tabs.create({ url: dashboardUrl });
   window.close();
+}
+
+btnOpenDashboard.addEventListener("click", openDashboard);
+btnDashboardFooter.addEventListener("click", openDashboard);
+
+// ─── Save Another ────────────────────────────────────────────
+
+btnSaveAnother.addEventListener("click", async () => {
+  await initSaveView();
 });
 
 // ─── Init ────────────────────────────────────────────────────
