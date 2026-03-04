@@ -2,22 +2,25 @@
 
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Pencil, Trash2, X, Check } from "lucide-react";
+import { Pencil, Trash2, X, Check, FolderPlus } from "lucide-react";
 import type { Bookmark, Tag } from "@/lib/types";
 import { createSupabaseBrowser } from "@/lib/supabase-browser";
+import { CollectionPickerDropdown } from "@/components/collection-picker-dropdown";
 
 interface BookmarkCardProps {
   bookmark: Bookmark & { bookmark_tags?: { tags: Tag }[] };
   onDelete: (id: string) => void;
   onUpdate: (bookmark: Bookmark) => void;
+  readOnly?: boolean;
 }
 
-export function BookmarkCard({ bookmark, onDelete, onUpdate }: BookmarkCardProps) {
+export function BookmarkCard({ bookmark, onDelete, onUpdate, readOnly }: BookmarkCardProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(bookmark.title ?? "");
   const [note, setNote] = useState(bookmark.note ?? "");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showCollectionPicker, setShowCollectionPicker] = useState(false);
 
   const supabase = createSupabaseBrowser();
   const tags =
@@ -132,35 +135,52 @@ export function BookmarkCard({ bookmark, onDelete, onUpdate }: BookmarkCardProps
               >
                 {bookmark.title || bookmark.url}
               </a>
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                <button
-                  onClick={() => setEditing(true)}
-                  className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 cursor-pointer"
-                  title="Edit"
-                >
-                  <Pencil size={13} />
-                </button>
-                {confirmDelete ? (
+              {!readOnly && (
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowCollectionPicker((v) => !v)}
+                      className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 cursor-pointer"
+                      title="Add to collection"
+                    >
+                      <FolderPlus size={13} />
+                    </button>
+                    {showCollectionPicker && (
+                      <CollectionPickerDropdown
+                        bookmarkId={bookmark.id}
+                        onClose={() => setShowCollectionPicker(false)}
+                      />
+                    )}
+                  </div>
                   <button
-                    onClick={handleDelete}
-                    className="p-1.5 rounded-md hover:bg-red-50 text-red-500 cursor-pointer"
-                    title="Confirm delete"
-                  >
-                    <Check size={13} />
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setConfirmDelete(true);
-                      setTimeout(() => setConfirmDelete(false), 3000);
-                    }}
+                    onClick={() => setEditing(true)}
                     className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 cursor-pointer"
-                    title="Delete"
+                    title="Edit"
                   >
-                    <Trash2 size={13} />
+                    <Pencil size={13} />
                   </button>
-                )}
-              </div>
+                  {confirmDelete ? (
+                    <button
+                      onClick={handleDelete}
+                      className="p-1.5 rounded-md hover:bg-red-50 text-red-500 cursor-pointer"
+                      title="Confirm delete"
+                    >
+                      <Check size={13} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setConfirmDelete(true);
+                        setTimeout(() => setConfirmDelete(false), 3000);
+                      }}
+                      className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 cursor-pointer"
+                      title="Delete"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Domain + time */}

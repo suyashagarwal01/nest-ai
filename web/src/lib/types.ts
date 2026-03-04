@@ -27,3 +27,27 @@ export interface Tag {
 export interface BookmarkWithTags extends Bookmark {
   bookmark_tags: { tag_id: string; source?: string; confidence?: number; tags: Tag }[];
 }
+
+export interface Collection {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  slug: string | null;
+  is_public: boolean;
+  cover_url: string | null;
+  bookmark_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CollectionMember {
+  collection_id: string;
+  user_id: string;
+  role: "viewer" | "editor";
+  invited_at: string;
+}
+
+export interface CollectionWithBookmarks extends Collection {
+  collection_bookmarks: { bookmark_id: string; added_at: string; bookmarks: Bookmark }[];
+}

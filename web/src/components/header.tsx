@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { createSupabaseBrowser } from "@/lib/supabase-browser";
 import { useRouter } from "next/navigation";
-import { LogOut, LayoutGrid, List, Layers, Download } from "lucide-react";
+import Link from "next/link";
+import { LogOut, LayoutGrid, List, Layers, Download, FolderOpen, Upload } from "lucide-react";
 
 type ViewType = "grid" | "list" | "grouped";
 
@@ -46,7 +47,25 @@ export function Header({ view, onViewChange, onExport, userEmail }: HeaderProps)
   return (
     <header className="border-b border-neutral-200 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-        <h1 className="text-lg font-bold tracking-tight">inSpace</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-bold tracking-tight">inSpace</h1>
+          <nav className="flex items-center gap-1">
+            <Link
+              href="/collections"
+              className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400"
+              title="Collections"
+            >
+              <FolderOpen size={16} />
+            </Link>
+            <Link
+              href="/import"
+              className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400"
+              title="Import"
+            >
+              <Upload size={16} />
+            </Link>
+          </nav>
+        </div>
 
         <div className="flex items-center gap-3">
           {/* View toggle */}

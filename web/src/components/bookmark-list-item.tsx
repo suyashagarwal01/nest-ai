@@ -2,24 +2,28 @@
 
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { ExternalLink, Pencil, Trash2, Check, X } from "lucide-react";
+import { ExternalLink, Pencil, Trash2, Check, X, FolderPlus } from "lucide-react";
 import type { Bookmark, Tag } from "@/lib/types";
 import { createSupabaseBrowser } from "@/lib/supabase-browser";
+import { CollectionPickerDropdown } from "@/components/collection-picker-dropdown";
 
 interface BookmarkListItemProps {
   bookmark: Bookmark & { bookmark_tags?: { tags: Tag }[] };
   onDelete: (id: string) => void;
   onUpdate: (bookmark: Bookmark) => void;
+  readOnly?: boolean;
 }
 
 export function BookmarkListItem({
   bookmark,
   onDelete,
   onUpdate,
+  readOnly,
 }: BookmarkListItemProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(bookmark.title ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showCollectionPicker, setShowCollectionPicker] = useState(false);
 
   const supabase = createSupabaseBrowser();
   const tags =
@@ -149,7 +153,7 @@ export function BookmarkListItem({
       </div>
 
       {/* Actions */}
-      {!editing && (
+      {!editing && !readOnly && (
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
           <a
             href={bookmark.url}
@@ -159,6 +163,21 @@ export function BookmarkListItem({
           >
             <ExternalLink size={13} />
           </a>
+          <div className="relative">
+            <button
+              onClick={() => setShowCollectionPicker((v) => !v)}
+              className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 cursor-pointer"
+              title="Add to collection"
+            >
+              <FolderPlus size={13} />
+            </button>
+            {showCollectionPicker && (
+              <CollectionPickerDropdown
+                bookmarkId={bookmark.id}
+                onClose={() => setShowCollectionPicker(false)}
+              />
+            )}
+          </div>
           <button
             onClick={() => setEditing(true)}
             className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 cursor-pointer"
