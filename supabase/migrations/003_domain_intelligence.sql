@@ -109,7 +109,7 @@ BEGIN
     HAVING COUNT(*) >= 2
   )
   SELECT st.domain, st.seg,
-    ARRAY_AGG(st.topic ORDER BY st.occ DESC)[1:5] as topics,
+    (ARRAY_AGG(st.topic ORDER BY st.occ DESC))[1:5] as topics,
     SUM(st.occ)::BIGINT as sample_count
   FROM seg_topics st
   GROUP BY st.domain, st.seg
