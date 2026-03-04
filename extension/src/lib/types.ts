@@ -51,6 +51,30 @@ export interface DomainInfo {
   defaultTopics?: string[];
 }
 
+/** Precomputed consensus tag from cross-user behavior */
+export interface ConsensusTag {
+  tag_name: string;
+  user_count: number;
+  total_saves: number;
+  frequency: number;
+  confidence: number;
+}
+
+/** Keyword → tag pattern learned from title analysis */
+export interface KeywordTagPattern {
+  keyword: string;
+  tag_name: string;
+  confidence: number;
+}
+
+/** Unified tag for popup rendering (all sources) */
+export interface DisplayTag {
+  name: string;
+  source: "tier1" | "collective_consensus" | "collective_keyword" | "user";
+  confidence: number;
+  isSuggested: boolean;
+}
+
 /** Payload sent from popup → background to save a bookmark */
 export interface SavePayload {
   url: string;
@@ -59,6 +83,8 @@ export interface SavePayload {
   captureScreenshot: boolean;
   meta: PageMeta;
   removedTopics?: string[];
+  acceptedCollectiveTags?: string[];
+  removedCollectiveTags?: string[];
 }
 
 /** Result of AI tagging (3-layer taxonomy) */

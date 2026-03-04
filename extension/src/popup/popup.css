@@ -362,6 +362,21 @@ body {
   background: rgba(239, 68, 68, 0.1);
 }
 
+.tag-collective {
+  background: #e8f4fd;
+  border: 1px dashed #90caf9;
+  color: #1565c0;
+}
+
+.tag-suggested {
+  opacity: 0.65;
+  transition: opacity 0.15s;
+}
+
+.tag-suggested:hover {
+  opacity: 1;
+}
+
 .tag-separator {
   display: inline-flex;
   align-items: center;

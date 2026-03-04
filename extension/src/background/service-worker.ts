@@ -1,6 +1,12 @@
 import { getSupabase } from "../lib/supabase";
 import { generateTags } from "../lib/tagger";
 import { initCache, setupCacheRefresh } from "../lib/domain-intelligence";
+import {
+  initCollectiveCache,
+  setupCollectiveRefresh,
+  normalizeTag,
+  recordFeedback,
+} from "../lib/collective-intelligence";
 import type { ExtensionMessage, SavePayload } from "../lib/types";
 
 /**
@@ -13,6 +19,12 @@ initCache().catch((err) =>
   console.warn("Domain intelligence init failed:", err)
 );
 setupCacheRefresh();
+
+// Initialize collective intelligence cache
+initCollectiveCache().catch((err) =>
+  console.warn("Collective intelligence init failed:", err)
+);
+setupCollectiveRefresh();
 
 // ---------- Screenshot capture ----------
 
@@ -89,10 +101,11 @@ async function saveBookmark(payload: SavePayload): Promise<void> {
     throw new Error("Not authenticated. Please sign in first.");
   }
 
-  // Generate tags (Tier 1: rule-based), filter out user-removed topics
+  // Generate tags (Tier 1: rule-based), normalize via aliases, filter removed
   const tagResult = generateTags(payload.meta);
+  tagResult.topics = tagResult.topics.map(normalizeTag);
   if (payload.removedTopics?.length) {
-    const removed = new Set(payload.removedTopics);
+    const removed = new Set(payload.removedTopics.map(normalizeTag));
     tagResult.topics = tagResult.topics.filter((t) => !removed.has(t));
   }
 
@@ -170,8 +183,9 @@ async function saveBookmark(payload: SavePayload): Promise<void> {
     }
   }
 
-  // Create/link user-added tags
-  for (const tagName of payload.userTags) {
+  // Create/link user-added tags (normalized)
+  for (const rawTagName of payload.userTags) {
+    const tagName = normalizeTag(rawTagName);
     const { data: tag } = await supabase
       .from("tags")
       .upsert(
@@ -195,6 +209,60 @@ async function saveBookmark(payload: SavePayload): Promise<void> {
         )
         .select();
     }
+  }
+
+  // Create/link accepted collective tags
+  if (payload.acceptedCollectiveTags?.length) {
+    for (const tagName of payload.acceptedCollectiveTags) {
+      const normalized = normalizeTag(tagName);
+      const { data: tag } = await supabase
+        .from("tags")
+        .upsert(
+          { user_id: user.id, name: normalized },
+          { onConflict: "user_id,name" }
+        )
+        .select()
+        .single();
+
+      if (tag) {
+        await supabase
+          .from("bookmark_tags")
+          .upsert(
+            {
+              bookmark_id: bookmark.id,
+              tag_id: tag.id,
+              source: "collective",
+              confidence: 0.8,
+            },
+            { onConflict: "bookmark_id,tag_id" }
+          )
+          .select();
+      }
+    }
+  }
+
+  // Record feedback (fire-and-forget — doesn't block save)
+  // Removed tier 1 topics
+  if (payload.removedTopics?.length) {
+    for (const topic of payload.removedTopics) {
+      recordFeedback(user.id, payload.url, normalizeTag(topic), "remove", "tier1");
+    }
+  }
+  // Removed collective tags
+  if (payload.removedCollectiveTags?.length) {
+    for (const tag of payload.removedCollectiveTags) {
+      recordFeedback(user.id, payload.url, normalizeTag(tag), "remove", "collective");
+    }
+  }
+  // Accepted collective tags
+  if (payload.acceptedCollectiveTags?.length) {
+    for (const tag of payload.acceptedCollectiveTags) {
+      recordFeedback(user.id, payload.url, normalizeTag(tag), "accept", "collective");
+    }
+  }
+  // User-added tags
+  for (const tag of payload.userTags) {
+    recordFeedback(user.id, payload.url, normalizeTag(tag), "add", "user");
   }
 }
 

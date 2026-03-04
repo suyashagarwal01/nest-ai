@@ -1,4 +1,4 @@
-name: Aggregate Domain Intelligence
+name: Aggregate Intelligence
 
 on:
   schedule:
@@ -11,7 +11,9 @@ jobs:
     steps:
       - name: Trigger aggregation Edge Function
         run: |
-          curl -sS -f -X POST \
+          RESPONSE=$(curl -sS -f -X POST \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "x-api-key: ${{ secrets.AGGREGATION_API_KEY }}" \
-            "${{ secrets.SUPABASE_URL }}/functions/v1/aggregate-domain-intelligence"
+            "${{ secrets.SUPABASE_URL }}/functions/v1/aggregate-domain-intelligence")
+          echo "Response: $RESPONSE"
+          echo "$RESPONSE" | jq '.'

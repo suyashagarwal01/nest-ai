@@ -1,6 +1,7 @@
 import { getSupabase } from "../lib/supabase";
-import { generateTags } from "../lib/tagger";
-import type { PageMeta, ExtensionMessage } from "../lib/types";
+import { generateTags, mergeWithCollective } from "../lib/tagger";
+import { fetchConsensusTags } from "../lib/collective-intelligence";
+import type { PageMeta, ExtensionMessage, DisplayTag } from "../lib/types";
 
 // ─── DOM Elements ────────────────────────────────────────────
 
@@ -39,6 +40,9 @@ const btnSaveAnother = document.getElementById("btn-save-another") as HTMLButton
 let currentMeta: PageMeta | null = null;
 let currentScreenshotUrl: string | null = null;
 let removedTopics: Set<string> = new Set();
+let removedCollectiveTags: Set<string> = new Set();
+let acceptedCollectiveTags: Set<string> = new Set();
+let currentDisplayTags: DisplayTag[] = [];
 
 // ─── View Management ─────────────────────────────────────────
 
@@ -215,6 +219,70 @@ function renderTagsPreview(tagResult: ReturnType<typeof generateTags>) {
   });
 }
 
+/**
+ * Render unified display tags (Tier 1 + collective consensus + keyword patterns).
+ * Replaces the basic topic rendering with source-aware styling.
+ */
+function renderDisplayTags(
+  tagResult: ReturnType<typeof generateTags>,
+  displayTags: DisplayTag[]
+) {
+  currentTagResult = tagResult;
+  currentDisplayTags = displayTags;
+
+  let html = "";
+
+  // Category + domain context (unchanged)
+  html += `<span class="tag tag-category">${tagResult.category}</span>`;
+  if (tagResult.domainContext) {
+    html += `<span class="tag tag-domain">${tagResult.domainContext}</span>`;
+  }
+
+  // Display tags with source-aware styling
+  for (const dt of displayTags) {
+    // Skip removed tags based on source
+    if (dt.source === "tier1" && removedTopics.has(dt.name)) continue;
+    if (
+      (dt.source === "collective_consensus" || dt.source === "collective_keyword") &&
+      removedCollectiveTags.has(dt.name)
+    ) continue;
+
+    const isCollective = dt.source === "collective_consensus" || dt.source === "collective_keyword";
+    const tagClasses = [
+      "tag",
+      "tag-topic",
+      isCollective ? "tag-collective" : "",
+      dt.isSuggested ? "tag-suggested" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    const tooltip = isCollective ? ' title="Community tag"' : "";
+    const dataSource = isCollective ? "collective" : "tier1";
+
+    html += `<span class="${tagClasses}"${tooltip}>${dt.name}<button class="tag-remove" data-topic="${dt.name}" data-source="${dataSource}" aria-label="Remove ${dt.name}">&times;</button></span>`;
+  }
+
+  tagsPreview.innerHTML = html;
+
+  // Attach remove handlers
+  tagsPreview.querySelectorAll(".tag-remove").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const topic = (btn as HTMLButtonElement).dataset.topic;
+      const source = (btn as HTMLButtonElement).dataset.source;
+      if (topic) {
+        if (source === "collective") {
+          removedCollectiveTags.add(topic);
+        } else {
+          removedTopics.add(topic);
+        }
+        renderDisplayTags(tagResult, displayTags);
+      }
+    });
+  });
+}
+
 // ─── Save View Init ──────────────────────────────────────────
 
 async function initSaveView() {
@@ -252,8 +320,26 @@ async function initSaveView() {
 
   // Generate tags and show preview (3-layer taxonomy)
   removedTopics = new Set();
+  removedCollectiveTags = new Set();
+  acceptedCollectiveTags = new Set();
   const tagResult = generateTags(currentMeta);
   renderTagsPreview(tagResult);
+
+  // Async: fetch consensus tags and merge → re-render with collective intelligence
+  fetchConsensusTags(currentMeta.url).then((consensusTags) => {
+    if (consensusTags.length > 0 && currentMeta) {
+      const displayTags = mergeWithCollective(tagResult, consensusTags, currentMeta.title);
+      // Track which collective tags the user sees (for accept tracking on save)
+      for (const dt of displayTags) {
+        if (dt.source === "collective_consensus" || dt.source === "collective_keyword") {
+          acceptedCollectiveTags.add(dt.name);
+        }
+      }
+      renderDisplayTags(tagResult, displayTags);
+    }
+  }).catch(() => {
+    // Consensus fetch failed — Tier 1 tags already rendered, nothing to do
+  });
 
   // Capture screenshot preview
   currentScreenshotUrl = await captureScreenshotPreview();
@@ -300,6 +386,11 @@ btnSave.addEventListener("click", async () => {
       .map((t) => t.trim().toLowerCase())
       .filter((t) => t.length > 0);
 
+    // Compute final accepted collective tags (shown minus removed)
+    const finalAccepted = [...acceptedCollectiveTags].filter(
+      (t) => !removedCollectiveTags.has(t)
+    );
+
     const response = await chrome.runtime.sendMessage({
       type: "SAVE_BOOKMARK",
       data: {
@@ -309,6 +400,8 @@ btnSave.addEventListener("click", async () => {
         captureScreenshot: toggleScreenshot.checked,
         meta: currentMeta,
         removedTopics: [...removedTopics],
+        acceptedCollectiveTags: finalAccepted,
+        removedCollectiveTags: [...removedCollectiveTags],
       },
     } as ExtensionMessage);
 

@@ -8,7 +8,8 @@ import {
   getCachedIntelligence,
   matchPathPattern,
 } from "./domain-intelligence";
-import type { PageMeta, TagResult } from "./types";
+import { matchKeywordPatterns, normalizeTag } from "./collective-intelligence";
+import type { PageMeta, TagResult, ConsensusTag, DisplayTag } from "./types";
 
 /** JSON-LD @type → category overrides */
 const JSON_LD_CATEGORY_MAP: Record<string, string> = {
@@ -137,4 +138,59 @@ export function generateTags(meta: PageMeta): TagResult {
   }
 
   return { category, domainContext, topics, confidence };
+}
+
+/**
+ * Merge Tier 1 tags with collective intelligence (consensus + keyword patterns).
+ * Returns a unified, deduplicated, sorted list of DisplayTags capped at 8.
+ */
+export function mergeWithCollective(
+  tier1Result: TagResult,
+  consensusTags: ConsensusTag[],
+  title: string
+): DisplayTag[] {
+  const seen = new Set<string>();
+  const tags: DisplayTag[] = [];
+
+  // 1. Tier 1 topics → DisplayTag (highest priority from local tagger)
+  for (const topic of tier1Result.topics) {
+    const normalized = normalizeTag(topic);
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    tags.push({
+      name: normalized,
+      source: "tier1",
+      confidence: tier1Result.confidence,
+      isSuggested: false,
+    });
+  }
+
+  // 2. Consensus tags (cross-user agreement on this URL)
+  for (const ct of consensusTags) {
+    const normalized = normalizeTag(ct.tag_name);
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    tags.push({
+      name: normalized,
+      source: "collective_consensus",
+      confidence: ct.confidence,
+      isSuggested: ct.confidence < 0.7,
+    });
+  }
+
+  // 3. Keyword pattern matches (title words → tags learned from all users)
+  const keywordTags = matchKeywordPatterns(title);
+  for (const kt of keywordTags) {
+    const normalized = normalizeTag(kt.name);
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    tags.push({
+      ...kt,
+      name: normalized,
+    });
+  }
+
+  // Sort by confidence descending, cap at 8
+  tags.sort((a, b) => b.confidence - a.confidence);
+  return tags.slice(0, 8);
 }
