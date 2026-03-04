@@ -58,6 +58,7 @@ export interface SavePayload {
   userTags: string[];
   captureScreenshot: boolean;
   meta: PageMeta;
+  removedTopics?: string[];
 }
 
 /** Result of AI tagging (3-layer taxonomy) */

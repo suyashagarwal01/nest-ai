@@ -38,6 +38,7 @@ const btnSaveAnother = document.getElementById("btn-save-another") as HTMLButton
 
 let currentMeta: PageMeta | null = null;
 let currentScreenshotUrl: string | null = null;
+let removedTopics: Set<string> = new Set();
 
 // ─── View Management ─────────────────────────────────────────
 
@@ -181,6 +182,39 @@ async function captureScreenshotPreview(): Promise<string | null> {
   }
 }
 
+// ─── Tag Rendering ───────────────────────────────────────
+
+let currentTagResult: ReturnType<typeof generateTags> | null = null;
+
+function renderTagsPreview(tagResult: ReturnType<typeof generateTags>) {
+  currentTagResult = tagResult;
+  let html = "";
+  html += `<span class="tag tag-category">${tagResult.category}</span>`;
+  if (tagResult.domainContext) {
+    html += `<span class="tag tag-domain">${tagResult.domainContext}</span>`;
+  }
+  html += tagResult.topics
+    .filter((t) => !removedTopics.has(t))
+    .map(
+      (t) =>
+        `<span class="tag tag-topic">${t}<button class="tag-remove" data-topic="${t}" aria-label="Remove ${t}">&times;</button></span>`
+    )
+    .join("");
+  tagsPreview.innerHTML = html;
+
+  // Attach remove handlers
+  tagsPreview.querySelectorAll(".tag-remove").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const topic = (btn as HTMLButtonElement).dataset.topic;
+      if (topic) {
+        removedTopics.add(topic);
+        renderTagsPreview(tagResult);
+      }
+    });
+  });
+}
+
 // ─── Save View Init ──────────────────────────────────────────
 
 async function initSaveView() {
@@ -217,16 +251,9 @@ async function initSaveView() {
   favicon.onerror = () => { favicon.style.display = "none"; };
 
   // Generate tags and show preview (3-layer taxonomy)
+  removedTopics = new Set();
   const tagResult = generateTags(currentMeta);
-  let tagsHtml = "";
-  tagsHtml += `<span class="tag tag-category">${tagResult.category}</span>`;
-  if (tagResult.domainContext) {
-    tagsHtml += `<span class="tag tag-domain">${tagResult.domainContext}</span>`;
-  }
-  tagsHtml += tagResult.topics
-    .map((t) => `<span class="tag">${t}</span>`)
-    .join("");
-  tagsPreview.innerHTML = tagsHtml;
+  renderTagsPreview(tagResult);
 
   // Capture screenshot preview
   currentScreenshotUrl = await captureScreenshotPreview();
@@ -276,6 +303,7 @@ btnSave.addEventListener("click", async () => {
         userTags,
         captureScreenshot: toggleScreenshot.checked,
         meta: currentMeta,
+        removedTopics: [...removedTopics],
       },
     } as ExtensionMessage);
 

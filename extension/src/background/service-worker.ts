@@ -89,8 +89,12 @@ async function saveBookmark(payload: SavePayload): Promise<void> {
     throw new Error("Not authenticated. Please sign in first.");
   }
 
-  // Generate tags (Tier 1: rule-based)
+  // Generate tags (Tier 1: rule-based), filter out user-removed topics
   const tagResult = generateTags(payload.meta);
+  if (payload.removedTopics?.length) {
+    const removed = new Set(payload.removedTopics);
+    tagResult.topics = tagResult.topics.filter((t) => !removed.has(t));
+  }
 
   // Capture screenshot if requested
   let screenshotDataUrl: string | null = null;
