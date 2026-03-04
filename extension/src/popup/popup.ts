@@ -1,7 +1,8 @@
 import { getSupabase } from "../lib/supabase";
 import { generateTags, mergeWithCollective } from "../lib/tagger";
+import { generateTagsWithAI } from "../lib/ai-tagger-orchestrator";
 import { fetchConsensusTags } from "../lib/collective-intelligence";
-import type { PageMeta, ExtensionMessage, DisplayTag } from "../lib/types";
+import type { PageMeta, ExtensionMessage, DisplayTag, DuplicateResult, TagResult } from "../lib/types";
 
 // ─── DOM Elements ────────────────────────────────────────────
 
@@ -17,6 +18,10 @@ const authError = document.getElementById("auth-error") as HTMLParagraphElement;
 const userAvatar = document.getElementById("user-avatar") as HTMLImageElement;
 const userName = document.getElementById("user-name") as HTMLSpanElement;
 const btnSignout = document.getElementById("btn-signout") as HTMLButtonElement;
+
+// Save — duplicate banner
+const duplicateBanner = document.getElementById("duplicate-banner") as HTMLDivElement;
+const duplicateDate = document.getElementById("duplicate-date") as HTMLSpanElement;
 
 // Save — form
 const inputTitle = document.getElementById("input-title") as HTMLInputElement;
@@ -43,6 +48,8 @@ let removedTopics: Set<string> = new Set();
 let removedCollectiveTags: Set<string> = new Set();
 let acceptedCollectiveTags: Set<string> = new Set();
 let currentDisplayTags: DisplayTag[] = [];
+let isDuplicate = false;
+let currentAISource: "ai_tier1" | "ai_tier2" | "ai_tier3" = "ai_tier1";
 
 // ─── View Management ─────────────────────────────────────────
 
@@ -318,27 +325,76 @@ async function initSaveView() {
   favicon.src = currentMeta.favicon;
   favicon.onerror = () => { favicon.style.display = "none"; };
 
-  // Generate tags and show preview (3-layer taxonomy)
+  // Check for duplicate (async, non-blocking)
+  isDuplicate = false;
+  duplicateBanner.style.display = "none";
+  btnSave.textContent = "Save";
+  chrome.runtime.sendMessage(
+    { type: "CHECK_DUPLICATE", url: currentMeta.url } as ExtensionMessage
+  ).then((resp: { data: DuplicateResult } | undefined) => {
+    if (resp?.data?.exists) {
+      isDuplicate = true;
+      const savedDate = resp.data.bookmark?.created_at
+        ? new Date(resp.data.bookmark.created_at).toLocaleDateString()
+        : "";
+      duplicateDate.textContent = savedDate ? `on ${savedDate}` : "";
+      duplicateBanner.style.display = "flex";
+      btnSave.textContent = "Update";
+    }
+  }).catch(() => {
+    // Duplicate check failed — proceed normally
+  });
+
+  // Check offline queue status
+  chrome.runtime.sendMessage(
+    { type: "GET_QUEUE_STATUS" } as ExtensionMessage
+  ).then((resp: { count: number } | undefined) => {
+    if (resp?.count && resp.count > 0) {
+      saveStatus.innerHTML = `<span class="save-queued-info">${resp.count} bookmark(s) pending sync</span>`;
+    }
+  }).catch(() => {});
+
+  // Generate tags with AI orchestration (Tier 1 → 2 → 3)
   removedTopics = new Set();
   removedCollectiveTags = new Set();
   acceptedCollectiveTags = new Set();
-  const tagResult = generateTags(currentMeta);
-  renderTagsPreview(tagResult);
+  currentAISource = "ai_tier1";
 
-  // Async: fetch consensus tags and merge → re-render with collective intelligence
-  fetchConsensusTags(currentMeta.url).then((consensusTags) => {
-    if (consensusTags.length > 0 && currentMeta) {
-      const displayTags = mergeWithCollective(tagResult, consensusTags, currentMeta.title);
-      // Track which collective tags the user sees (for accept tracking on save)
-      for (const dt of displayTags) {
-        if (dt.source === "collective_consensus" || dt.source === "collective_keyword") {
-          acceptedCollectiveTags.add(dt.name);
+  // Helper to fetch consensus and merge with a given tagResult
+  const fetchAndMergeConsensus = (tagResult: TagResult) => {
+    if (!currentMeta) return;
+    fetchConsensusTags(currentMeta.url).then((consensusTags) => {
+      if (consensusTags.length > 0 && currentMeta) {
+        const displayTags = mergeWithCollective(tagResult, consensusTags, currentMeta.title);
+        for (const dt of displayTags) {
+          if (dt.source === "collective_consensus" || dt.source === "collective_keyword") {
+            acceptedCollectiveTags.add(dt.name);
+          }
         }
+        renderDisplayTags(tagResult, displayTags);
       }
-      renderDisplayTags(tagResult, displayTags);
+    }).catch(() => {});
+  };
+
+  const metaForAI = currentMeta;
+  generateTagsWithAI(
+    metaForAI,
+    // onTier1 — immediate render
+    ({ tagResult, source }) => {
+      currentAISource = source;
+      renderTagsPreview(tagResult);
+      fetchAndMergeConsensus(tagResult);
+    },
+    // onUpgrade — AI tags replace Tier 1
+    ({ tagResult, source }) => {
+      currentAISource = source;
+      removedTopics = new Set();
+      acceptedCollectiveTags = new Set();
+      renderTagsPreview(tagResult);
+      fetchAndMergeConsensus(tagResult);
     }
-  }).catch(() => {
-    // Consensus fetch failed — Tier 1 tags already rendered, nothing to do
+  ).catch(() => {
+    // AI orchestration failed — Tier 1 already rendered
   });
 
   // Capture screenshot preview
@@ -369,6 +425,10 @@ toggleScreenshot.addEventListener("change", () => {
 
 function showSaveError(message: string) {
   saveStatus.innerHTML = `<span class="save-error"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>${message}</span>`;
+}
+
+function showSaveQueued(pendingCount: number) {
+  saveStatus.innerHTML = `<span class="save-queued">Saved offline — will sync when online (${pendingCount} pending)</span>`;
 }
 
 btnSave.addEventListener("click", async () => {
@@ -402,11 +462,19 @@ btnSave.addEventListener("click", async () => {
         removedTopics: [...removedTopics],
         acceptedCollectiveTags: finalAccepted,
         removedCollectiveTags: [...removedCollectiveTags],
+        aiSource: currentAISource,
       },
     } as ExtensionMessage);
 
     if (response?.success) {
       showView("success");
+    } else if (response?.error === "__OFFLINE__") {
+      // Get updated queue count from background
+      const queueResp = await chrome.runtime.sendMessage({
+        type: "GET_QUEUE_STATUS",
+      } as ExtensionMessage);
+      showSaveQueued(queueResp?.count ?? 1);
+      btnSave.disabled = false;
     } else {
       showSaveError(response?.error ?? "Failed to save.");
       btnSave.disabled = false;

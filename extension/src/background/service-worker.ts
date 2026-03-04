@@ -7,7 +7,15 @@ import {
   normalizeTag,
   recordFeedback,
 } from "../lib/collective-intelligence";
-import type { ExtensionMessage, SavePayload } from "../lib/types";
+import {
+  enqueue,
+  dequeue,
+  incrementRetry,
+  getQueue,
+  getPendingCount,
+  updateBadge,
+} from "../lib/offline-queue";
+import type { ExtensionMessage, SavePayload, DuplicateResult } from "../lib/types";
 
 /**
  * Background service worker.
@@ -86,6 +94,41 @@ async function uploadScreenshot(
     screenshotUrl: urlData.publicUrl,
     thumbnailUrl: urlData.publicUrl, // TODO: generate actual thumbnail in Phase 2
   };
+}
+
+// ---------- Duplicate check ----------
+
+async function checkDuplicate(url: string): Promise<DuplicateResult> {
+  const supabase = getSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { exists: false };
+
+  const { data: bookmark } = await supabase
+    .from("bookmarks")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("url", url)
+    .maybeSingle();
+
+  if (!bookmark) return { exists: false };
+
+  // Fetch associated tag names
+  const { data: tagRows } = await supabase
+    .from("bookmark_tags")
+    .select("tags(name)")
+    .eq("bookmark_id", bookmark.id);
+
+  const tags =
+    tagRows
+      ?.map((r: Record<string, unknown>) => {
+        const t = r.tags as { name: string } | null;
+        return t?.name;
+      })
+      .filter(Boolean) as string[] ?? [];
+
+  return { exists: true, bookmark, tags };
 }
 
 // ---------- Save bookmark ----------
@@ -174,7 +217,7 @@ async function saveBookmark(payload: SavePayload): Promise<void> {
           {
             bookmark_id: bookmark.id,
             tag_id: tag.id,
-            source: "ai_tier1",
+            source: payload.aiSource ?? "ai_tier1",
             confidence: tagResult.confidence,
           },
           { onConflict: "bookmark_id,tag_id" }
@@ -266,6 +309,43 @@ async function saveBookmark(payload: SavePayload): Promise<void> {
   }
 }
 
+// ---------- Offline queue helpers ----------
+
+const NETWORK_ERROR_PATTERNS = [
+  "failed to fetch",
+  "networkerror",
+  "network request failed",
+  "net::err_",
+  "the internet connection appears to be offline",
+  "load failed",
+];
+
+function isNetworkError(err: unknown): boolean {
+  const msg =
+    err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return NETWORK_ERROR_PATTERNS.some((p) => msg.includes(p));
+}
+
+async function processQueue(): Promise<void> {
+  const queue = await getQueue();
+  if (queue.length === 0) return;
+
+  for (const item of queue) {
+    try {
+      await saveBookmark(item.payload);
+      await dequeue(item.id);
+    } catch (err) {
+      if (isNetworkError(err)) {
+        // Still offline — stop processing
+        break;
+      }
+      // Other error (auth, server) — increment retry, continue
+      await incrementRetry(item.id);
+    }
+  }
+  await updateBadge();
+}
+
 // ---------- Message listener ----------
 
 chrome.runtime.onMessage.addListener(
@@ -273,17 +353,67 @@ chrome.runtime.onMessage.addListener(
     if (message.type === "SAVE_BOOKMARK") {
       saveBookmark(message.data)
         .then(() => sendResponse({ type: "SAVE_RESULT", success: true }))
-        .catch((err) =>
-          sendResponse({
-            type: "SAVE_RESULT",
-            success: false,
-            error: err.message,
-          })
+        .catch(async (err) => {
+          if (isNetworkError(err)) {
+            await enqueue(message.data);
+            await updateBadge();
+            sendResponse({
+              type: "SAVE_RESULT",
+              success: false,
+              error: "__OFFLINE__",
+            });
+          } else {
+            sendResponse({
+              type: "SAVE_RESULT",
+              success: false,
+              error: err.message,
+            });
+          }
+        });
+      return true;
+    }
+
+    if (message.type === "CHECK_DUPLICATE") {
+      checkDuplicate(message.url)
+        .then((data) =>
+          sendResponse({ type: "DUPLICATE_RESULT", data })
+        )
+        .catch(() =>
+          sendResponse({ type: "DUPLICATE_RESULT", data: { exists: false } })
         );
-      return true; // keep channel open for async response
+      return true;
+    }
+
+    if (message.type === "GET_QUEUE_STATUS") {
+      getPendingCount()
+        .then((count) =>
+          sendResponse({ type: "QUEUE_STATUS", count })
+        )
+        .catch(() =>
+          sendResponse({ type: "QUEUE_STATUS", count: 0 })
+        );
+      return true;
     }
   }
 );
+
+// ---------- Offline queue: process on startup, install, and alarm ----------
+
+chrome.runtime.onStartup.addListener(() => {
+  processQueue().catch(() => {});
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  // Create recurring alarm for queue retry (every 5 minutes)
+  chrome.alarms.create("offline-queue-retry", { periodInMinutes: 5 });
+  processQueue().catch(() => {});
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "offline-queue-retry") {
+    processQueue().catch(() => {});
+  }
+});
 
 // ---------- Keyboard shortcut ----------
 

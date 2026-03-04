@@ -85,6 +85,22 @@ export interface SavePayload {
   removedTopics?: string[];
   acceptedCollectiveTags?: string[];
   removedCollectiveTags?: string[];
+  aiSource?: "ai_tier1" | "ai_tier2" | "ai_tier3";
+}
+
+/** Duplicate check result */
+export interface DuplicateResult {
+  exists: boolean;
+  bookmark?: Bookmark;
+  tags?: string[];
+}
+
+/** Queued bookmark for offline save */
+export interface QueuedBookmark {
+  id: string;
+  payload: SavePayload;
+  queuedAt: number;
+  retryCount: number;
 }
 
 /** Result of AI tagging (3-layer taxonomy) */
@@ -114,4 +130,8 @@ export type ExtensionMessage =
   | { type: "GET_PAGE_META" }
   | { type: "PAGE_META"; data: PageMeta }
   | { type: "SAVE_BOOKMARK"; data: SavePayload }
-  | { type: "SAVE_RESULT"; success: boolean; error?: string };
+  | { type: "SAVE_RESULT"; success: boolean; error?: string }
+  | { type: "CHECK_DUPLICATE"; url: string }
+  | { type: "DUPLICATE_RESULT"; data: DuplicateResult }
+  | { type: "GET_QUEUE_STATUS" }
+  | { type: "QUEUE_STATUS"; count: number };

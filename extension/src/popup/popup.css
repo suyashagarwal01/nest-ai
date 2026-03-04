@@ -255,6 +255,25 @@ body {
   white-space: nowrap;
 }
 
+/* ─── Duplicate Banner ──────────────────────────────────── */
+.duplicate-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #FFF7ED;
+  border: 1px solid #FED7AA;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  color: #92400E;
+  line-height: 18px;
+}
+
+.duplicate-banner svg {
+  flex-shrink: 0;
+}
+
 /* ─── Screenshot Preview ────────────────────────────────── */
 .screenshot-preview {
   width: 100%;
@@ -360,6 +379,24 @@ body {
 .tag-remove:hover {
   color: var(--color-error);
   background: rgba(239, 68, 68, 0.1);
+}
+
+.tag-ai {
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #166534;
+}
+
+.ai-badge {
+  display: inline-block;
+  font-size: var(--font-size-overline);
+  font-weight: var(--font-weight-medium);
+  color: #166534;
+  background: #DCFCE7;
+  padding: 1px 5px;
+  border-radius: var(--radius-full);
+  line-height: 16px;
+  margin-left: 2px;
 }
 
 .tag-collective {
@@ -492,6 +529,20 @@ body {
 
 .save-error svg {
   flex-shrink: 0;
+}
+
+.save-queued {
+  color: #B45309;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  line-height: 18px;
+}
+
+.save-queued-info {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: 18px;
 }
 
 /* ─── Success ───────────────────────────────────────────── */
