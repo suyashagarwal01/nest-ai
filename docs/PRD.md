@@ -1,9 +1,9 @@
 # PRD: inSpace — Smart Bookmarking Chrome Extension
 
-**Version:** 1.3
+**Version:** 1.4
 **Author:** Product Lead
 **Date:** March 4, 2026
-**Status:** Active — AI Tagging Phases 1-3 Complete
+**Status:** Active — Phase 2 Complete
 
 ---
 
@@ -198,7 +198,7 @@ User opens dashboard → Selects multiple items via checkbox
 │  ┌─────────┐  ┌──────────┐  ┌──────────────────────────────┐│
 │  │  Popup   │  │ Content  │  │     Background Worker        ││
 │  │  (UI)    │  │ Script   │  │  - Screenshot capture        ││
-│  │          │  │ (meta    │  │  - AI tagging (Tier 1)       ││
+│  │          │  │ (meta    │  │  - AI tagging (Tier 1-3)     ││
 │  │ Tag      │  │ extract) │  │  - Collective intelligence   ││
 │  │ preview  │  │          │  │  - Feedback recording        ││
 │  │ + merge  │  │          │  │  - Tag alias normalization   ││
@@ -229,7 +229,7 @@ User opens dashboard → Selects multiple items via checkbox
 │  │  - Domain intelligence aggregation (daily cron)      │    │
 │  │  - Collective intelligence aggregation (daily cron)  │    │
 │  │  - Feedback-based confidence adjustments             │    │
-│  │  - AI tagging fallback (Gemini API call)             │    │
+│  │  - gemini-tagger (Gemini 2.5 Flash Lite, 14 RPM)     │    │
 │  └──────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────┘
                        │
@@ -401,28 +401,32 @@ Tag sources (priority order): path patterns (learned) → article tags → meta 
 
 **Expected coverage:** ~80% of saves get reasonable tags from Tier 1 alone.
 
-### 8.2 Tier 2: Chrome Built-in AI (Client-Side, Free) — Planned
+### 8.2 Tier 2: Chrome Built-in AI (Client-Side, Free) — Implemented
 
-Chrome's Prompt API (origin trial / shipping progressively):
+Chrome's Prompt API (`self.ai.languageModel`) used when available:
 ```javascript
-const session = await chrome.ai.languageModel.create();
-const result = await session.prompt(
-  `Classify this webpage and generate 3-5 tags.
-   Title: "${title}"
-   Description: "${description}"
-   Domain: "${domain}"
-   Return JSON: { "category": "...", "tags": ["...", "..."] }`
-);
+const session = await self.ai.languageModel.create({ systemPrompt: "..." });
+const result = await session.prompt(`URL: ... Title: ... Description: ...`);
+// Parses JSON response → { category, topics }
 ```
 
-Fallback: A small ONNX text classification model (~5 MB) loaded via Transformers.js, classifying into predefined categories.
+**Escalation threshold:** Tier 2 is invoked only when Tier 1 produces `category === "Other"`, `topics.length < 3`, or `confidence < 0.7`. Feature-detected at runtime — gracefully skipped on Chrome Stable or browsers without the Prompt API.
 
-### 8.3 Tier 3: Gemini Free Tier (Server-Side, Batched) — Planned
+### 8.3 Tier 3: Gemini Free Tier (Server-Side, Real-Time) — Implemented
 
-For saves where Tier 1+2 produce low-confidence results:
-- Queue untagged items.
-- Process in batches via Supabase Edge Function calling Gemini API.
-- Free tier: 15 requests/min, 1M tokens/day — handles hundreds of tag requests daily.
+For saves where Tier 1+2 produce low-confidence results, the extension calls a Supabase Edge Function (`gemini-tagger`) which proxies to the Gemini API:
+
+- **Model:** `gemini-2.5-flash-lite` (free tier, lowest latency)
+- **Rate limit:** In-memory 14 RPM cap (under 15 RPM free limit), returns 429 if exceeded
+- **Flow:** Extension → Edge Function → Gemini API → validated JSON → merged with Tier 1 tags
+- **Async upgrade:** Tier 1 tags render immediately; upgraded tags replace them when Tier 2/3 returns (1-2s)
+
+**AI Tagger Orchestrator** (`ai-tagger-orchestrator.ts`) coordinates all three tiers with a callback-based API:
+1. Tier 1 runs synchronously → `onTier1()` callback renders tags instantly
+2. If escalation needed → tries Tier 2 (Chrome AI) → `onUpgrade()` re-renders
+3. If Tier 2 unavailable/failed → tries Tier 3 (Gemini) → `onUpgrade()` re-renders
+
+**Merge strategy:** AI category replaces "Other" (keeps Tier 1 category otherwise). AI topics prepended, Tier 1 topics appended, deduplicated, capped at 5. Confidence boosted to ≥0.8.
 
 ### 8.4 Domain Intelligence (Learned Patterns) — Implemented
 
@@ -525,14 +529,14 @@ Daily cron (GitHub Actions)
 - [x] Feedback-based confidence adjustments in Edge Function
 - [x] 90-day feedback pruning
 
-### Phase 2 — Dashboard & Polish (Weeks 5-8)
-- [ ] Chrome AI / Gemini-powered tagging (Tier 2 + 3)
-- [ ] Full-text search with Postgres `tsvector`
-- [ ] List view and grouped view
-- [ ] Bulk operations (delete, tag, re-categorize)
-- [ ] Duplicate detection and merge
-- [ ] Data export (JSON, CSV)
-- [ ] Offline save queue with background sync
+### Phase 2 — Dashboard & Polish (Complete)
+- [x] Full-text search with Postgres `tsvector`
+- [x] List view and grouped view
+- [x] Data export (JSON, CSV)
+- [x] Duplicate detection with "Already saved — update?" prompt
+- [x] Offline save queue with background sync (5-min alarm retry, badge count)
+- [x] Chrome AI / Gemini-powered tagging (Tier 2 + 3)
+- [ ] Bulk operations (delete, tag, re-categorize) — deferred to Phase 3
 
 ### Phase 3 — Scale & Sharing (Weeks 9-16)
 - [ ] Public collections: share a curated set of bookmarks via link
