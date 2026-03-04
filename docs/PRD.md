@@ -1,9 +1,9 @@
 # PRD: inSpace — Smart Bookmarking Chrome Extension
 
-**Version:** 1.0
+**Version:** 1.3
 **Author:** Product Lead
-**Date:** March 2, 2026
-**Status:** Draft
+**Date:** March 4, 2026
+**Status:** Active — AI Tagging Phases 1-3 Complete
 
 ---
 
@@ -83,19 +83,28 @@ Saves 5-15 links per day across work and personal browsing. Uses browser bookmar
 2. **Page metadata extraction** — `<meta>` tags, Open Graph data, `<title>`, and `<h1>` content.
 3. **AI-generated tags** — An LLM analyzes the title + description + domain to produce 2-5 semantic tags.
 
-**Tagging strategy (zero-cost approach):**
-- **Tier 1 — Rule-based (instant, free):** A curated domain→category map (top 500 domains) + keyword extraction from title/meta. Runs client-side, covers ~80% of saves.
+**Tagging strategy (zero-cost, 3-layer taxonomy):**
+
+Every bookmark is tagged with a **Category** (e.g. "Development") + **Domain Context** (e.g. "GitHub — Code Hosting") + **Topics** (e.g. ["react", "hooks", "performance"]).
+
+- **Tier 1 — Rule-based (instant, free):** A curated domain→category map (~160 domains) + path-based overrides + JSON-LD detection + keyword extraction from title/meta/headings. Runs client-side, covers ~80% of saves.
 - **Tier 2 — On-device AI (free):** Use Chrome's built-in AI APIs (`chrome.ai` / Prompt API) if available, or a lightweight classifier model via TensorFlow.js / ONNX Runtime Web. Runs entirely in the browser.
 - **Tier 3 — Free-tier LLM API (fallback):** For items that Tier 1 & 2 can't confidently tag, batch them and process via a free-tier API (Google Gemini free tier: 15 RPM / 1M tokens per day — more than sufficient for tagging).
+
+**Intelligence layers (learned from aggregate behavior):**
+- **Domain Intelligence:** Learns default categories, common topics, and path patterns from aggregate saves per domain. Refreshed daily via Edge Function.
+- **Collective Intelligence:** Cross-user consensus tags auto-surface when 3+ eligible users tag the same URL similarly. Title keyword patterns propagate tags across domains. A feedback loop (remove/accept signals) adjusts tag quality over time. Tag aliases normalize variant spellings (e.g. "ML" → "machine-learning").
 
 **Tag output example:**
 ```
 URL: https://github.com/anthropics/claude-code
-Tags: [Development, AI, CLI, Tools, Open Source]
 Category: Development
+Domain Context: GitHub — Code Hosting
+Topics: [ai, cli, tools, open-source]              ← Tier 1 (local)
+Community: [developer-tools, anthropic]              ← Collective consensus (blue)
 ```
 
-Users can edit, remove, or add tags manually.
+Users can edit, remove, or add tags manually. Removed community tags feed into the feedback loop to improve future suggestions.
 
 ### 5.3 Web Dashboard (Cross-Device Access)
 
@@ -184,43 +193,56 @@ User opens dashboard → Selects multiple items via checkbox
 ## 7. Technical Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Chrome Extension                      │
-│  ┌─────────┐  ┌──────────┐  ┌────────────────────────┐ │
-│  │  Popup   │  │ Content  │  │   Background Worker    │ │
-│  │  (UI)    │  │ Script   │  │  - Screenshot capture  │ │
-│  │          │  │ (meta    │  │  - AI tagging (Tier 1) │ │
-│  │          │  │ extract) │  │  - Supabase sync       │ │
-│  └─────────┘  └──────────┘  └────────────────────────┘ │
-└──────────────────────┬──────────────────────────────────┘
-                       │ HTTPS
-                       ▼
-┌─────────────────────────────────────────────────────────┐
-│                  Supabase (Backend)                       │
-│  ┌──────────┐  ┌──────────────┐  ┌───────────────────┐ │
-│  │   Auth   │  │   Postgres   │  │     Storage       │ │
-│  │          │  │   Database   │  │  (Screenshots)    │ │
-│  │ Google/  │  │              │  │                   │ │
-│  │ Email    │  │  bookmarks   │  │  JPEG images      │ │
-│  │          │  │  tags        │  │  Thumbnails       │ │
-│  │          │  │  categories  │  │                   │ │
-│  └──────────┘  └──────────────┘  └───────────────────┘ │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │          Edge Functions (Optional)                │   │
-│  │  - AI tagging fallback (Gemini API call)         │   │
-│  │  - OG image fallback fetch                       │   │
-│  └──────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                      Chrome Extension                         │
+│  ┌─────────┐  ┌──────────┐  ┌──────────────────────────────┐│
+│  │  Popup   │  │ Content  │  │     Background Worker        ││
+│  │  (UI)    │  │ Script   │  │  - Screenshot capture        ││
+│  │          │  │ (meta    │  │  - AI tagging (Tier 1)       ││
+│  │ Tag      │  │ extract) │  │  - Collective intelligence   ││
+│  │ preview  │  │          │  │  - Feedback recording        ││
+│  │ + merge  │  │          │  │  - Tag alias normalization   ││
+│  └─────────┘  └──────────┘  │  - Supabase sync             ││
+│       │                      │  - Cache refresh (hourly)     ││
+│       │ consensus fetch      └──────────────────────────────┘│
+│       └──── async ─────────────────────┐                     │
+└──────────────────────┬─────────────────┼─────────────────────┘
+                       │ HTTPS           │
+                       ▼                 ▼
+┌──────────────────────────────────────────────────────────────┐
+│                     Supabase (Backend)                         │
+│  ┌──────────┐  ┌──────────────────┐  ┌───────────────────┐  │
+│  │   Auth   │  │     Postgres     │  │     Storage       │  │
+│  │          │  │                  │  │  (Screenshots)    │  │
+│  │ Google/  │  │  bookmarks       │  │                   │  │
+│  │ Email    │  │  tags            │  │  JPEG images      │  │
+│  │          │  │  bookmark_tags   │  │  Thumbnails       │  │
+│  │          │  │  profiles        │  │                   │  │
+│  │          │  │  domain_intel    │  │                   │  │
+│  │          │  │  url_consensus   │  │                   │  │
+│  │          │  │  keyword_patt    │  │                   │  │
+│  │          │  │  tag_feedback    │  │                   │  │
+│  │          │  │  tag_aliases     │  │                   │  │
+│  └──────────┘  └──────────────────┘  └───────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │             Edge Functions                            │    │
+│  │  - Domain intelligence aggregation (daily cron)      │    │
+│  │  - Collective intelligence aggregation (daily cron)  │    │
+│  │  - Feedback-based confidence adjustments             │    │
+│  │  - AI tagging fallback (Gemini API call)             │    │
+│  └──────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────┘
                        │
-                       ▼
-┌─────────────────────────────────────────────────────────┐
-│              Web Dashboard (Vercel)                       │
-│  Next.js / React static site                             │
-│  - Grid/List/Group views                                 │
-│  - Search & filter                                       │
-│  - Edit/Delete                                           │
-│  - Responsive (mobile-friendly)                          │
-└─────────────────────────────────────────────────────────┘
+       ┌───────────────┤
+       ▼               ▼
+┌──────────────┐  ┌──────────────────────────────┐
+│ GitHub       │  │ Web Dashboard (Vercel)         │
+│ Actions      │  │ Next.js / React                │
+│              │  │ - Grid/List/Group views         │
+│ Daily cron   │  │ - Search & filter               │
+│ → triggers   │  │ - Edit/Delete                   │
+│ Edge Fn      │  │ - Responsive (mobile-friendly)  │
+└──────────────┘  └──────────────────────────────┘
 ```
 
 ### Database Schema (Postgres via Supabase)
@@ -231,6 +253,7 @@ CREATE TABLE profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id),
   display_name TEXT,
   avatar_url TEXT,
+  save_count INTEGER DEFAULT 0,      -- refreshed daily; 10+ saves = eligible for consensus
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -248,6 +271,7 @@ CREATE TABLE bookmarks (
   domain TEXT GENERATED ALWAYS AS (
     substring(url from 'https?://([^/]+)')
   ) STORED,
+  domain_context TEXT,               -- e.g. "GitHub — Code Hosting"
   category TEXT,
   has_screenshot BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -266,15 +290,63 @@ CREATE TABLE tags (
 CREATE TABLE bookmark_tags (
   bookmark_id UUID REFERENCES bookmarks(id) ON DELETE CASCADE,
   tag_id UUID REFERENCES tags(id) ON DELETE CASCADE,
+  source TEXT DEFAULT 'user',        -- user | ai_tier1 | ai_tier2 | ai_tier3 | collective
+  confidence REAL DEFAULT 1.0,
   PRIMARY KEY (bookmark_id, tag_id)
 );
 
--- Indexes for search performance
-CREATE INDEX idx_bookmarks_user_id ON bookmarks(user_id);
-CREATE INDEX idx_bookmarks_domain ON bookmarks(domain);
-CREATE INDEX idx_bookmarks_created_at ON bookmarks(created_at DESC);
-CREATE INDEX idx_bookmarks_search ON bookmarks
-  USING GIN (to_tsvector('english', coalesce(title,'') || ' ' || coalesce(description,'') || ' ' || coalesce(note,'')));
+-- Domain Intelligence (learned patterns per domain)
+CREATE TABLE domain_intelligence (
+  domain TEXT PRIMARY KEY,
+  domain_type TEXT,
+  default_category TEXT,
+  common_topics TEXT[] DEFAULT '{}',
+  path_patterns JSONB DEFAULT '{"segments":{}}'::jsonb,
+  save_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Collective Intelligence: consensus tags per URL
+CREATE TABLE url_tag_consensus (
+  url TEXT NOT NULL,
+  tag_name TEXT NOT NULL,
+  user_count INTEGER DEFAULT 0,
+  total_saves INTEGER DEFAULT 0,
+  frequency REAL DEFAULT 0,          -- ratio of users who applied this tag
+  confidence REAL DEFAULT 0,         -- 0.6 (3 users) → 0.85 (10+ users)
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (url, tag_name)
+);
+
+-- Collective Intelligence: title keyword → tag correlations
+CREATE TABLE keyword_tag_patterns (
+  keyword TEXT NOT NULL,
+  tag_name TEXT NOT NULL,
+  user_count INTEGER DEFAULT 0,
+  adoption_rate REAL DEFAULT 0,
+  confidence REAL DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (keyword, tag_name)
+);
+
+-- Tag Feedback: user signals on tag quality
+CREATE TABLE tag_feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  tag_name TEXT NOT NULL,
+  action TEXT CHECK (action IN ('remove', 'add', 'accept')),
+  source TEXT DEFAULT 'unknown',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Tag Aliases: variant spellings → canonical form
+CREATE TABLE tag_aliases (
+  alias TEXT PRIMARY KEY,            -- e.g. "ml", "k8s", "js"
+  canonical TEXT NOT NULL,           -- e.g. "machine-learning", "kubernetes", "javascript"
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
 ### Row Level Security (RLS)
@@ -284,40 +356,52 @@ ALTER TABLE bookmarks ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can CRUD own bookmarks"
   ON bookmarks FOR ALL
   USING (auth.uid() = user_id);
+
+-- Collective intelligence tables: public read for authenticated users
+-- (written by Edge Function via service role)
+ALTER TABLE url_tag_consensus ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated read" ON url_tag_consensus FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+ALTER TABLE keyword_tag_patterns ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated read" ON keyword_tag_patterns FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+ALTER TABLE tag_aliases ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated read" ON tag_aliases FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+-- Feedback: users insert/read own
+ALTER TABLE tag_feedback ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users insert/read own" ON tag_feedback FOR ALL
+  USING (auth.uid() = user_id);
 ```
 
 ---
 
 ## 8. AI Tagging — Deep Dive
 
-### Tier 1: Rule-Based (Client-Side, Instant)
+### 8.1 Tier 1: Rule-Based (Client-Side, Instant) — Implemented
 
-A domain→category map covering the top 500 domains:
+A domain→category map covering ~160 domains with structured metadata:
 
 ```javascript
-const DOMAIN_CATEGORIES = {
-  "github.com": "Development",
-  "stackoverflow.com": "Development",
-  "npmjs.com": "Development",
-  "medium.com": "Articles",
-  "dev.to": "Development",
-  "arxiv.org": "Research",
-  "dribbble.com": "Design",
-  "figma.com": "Design",
-  "youtube.com": "Video",
-  "twitter.com": "Social",
-  "docs.google.com": "Documents",
-  // ... 490 more
+const DOMAIN_MAP = {
+  "github.com": { category: "Development", type: "code_hosting", label: "GitHub", defaultTopics: ["open-source"] },
+  "stackoverflow.com": { category: "Development", type: "qa_forum", label: "Stack Overflow" },
+  "arxiv.org": { category: "Research", type: "preprints", label: "arXiv" },
+  "dribbble.com": { category: "Design", type: "portfolio", label: "Dribbble" },
+  // ... ~160 domains
 };
 ```
 
-Plus keyword extraction from the page title for generating tags:
-- Split title into words, remove stop words, take top 3-5 meaningful terms.
-- Match against a curated keyword→tag dictionary.
+3-layer taxonomy output: **Category** + **Domain Context** + **Topics** (up to 5).
+
+Tag sources (priority order): path patterns (learned) → article tags → meta keywords → intelligence common topics → domain defaults → title keywords → heading keywords.
 
 **Expected coverage:** ~80% of saves get reasonable tags from Tier 1 alone.
 
-### Tier 2: Chrome Built-in AI (Client-Side, Free)
+### 8.2 Tier 2: Chrome Built-in AI (Client-Side, Free) — Planned
 
 Chrome's Prompt API (origin trial / shipping progressively):
 ```javascript
@@ -333,12 +417,61 @@ const result = await session.prompt(
 
 Fallback: A small ONNX text classification model (~5 MB) loaded via Transformers.js, classifying into predefined categories.
 
-### Tier 3: Gemini Free Tier (Server-Side, Batched)
+### 8.3 Tier 3: Gemini Free Tier (Server-Side, Batched) — Planned
 
 For saves where Tier 1+2 produce low-confidence results:
 - Queue untagged items.
 - Process in batches via Supabase Edge Function calling Gemini API.
 - Free tier: 15 requests/min, 1M tokens/day — handles hundreds of tag requests daily.
+
+### 8.4 Domain Intelligence (Learned Patterns) — Implemented
+
+Aggregate behavior across all users teaches the system per-domain patterns:
+
+- **Domain stats:** Most common category and top topics per domain (from 2+ saves).
+- **Path patterns:** First URL path segment → topic correlations (e.g. `github.com/topics/` → relevant topic tags).
+- Stored in `domain_intelligence` table, refreshed daily via Edge Function + GitHub Actions cron.
+- Extension caches top 500 domains in `chrome.storage.local` (hourly refresh).
+
+### 8.5 Collective Intelligence (Cross-User Consensus) — Implemented
+
+The system learns from collective user behavior:
+
+**URL Consensus Tags:**
+- When 3+ eligible users (each with 10+ saves) bookmark the same URL, overlapping tags become "consensus tags."
+- Consensus tags auto-surface for new users saving that URL (shown as blue dashed-border pills in the popup).
+- Confidence scales from 0.6 (3 users) to 0.85 (10+ users), boosted for high frequency (≥80%).
+
+**Keyword-Tag Patterns:**
+- Title words (≥4 chars) are correlated with tags across users.
+- When a keyword+tag pair appears in 3+ users with ≥50% adoption rate, it becomes a pattern.
+- Patterns propagate tags across domains (e.g. "kubernetes" in title → "devops" tag, regardless of domain).
+
+**Feedback Loop:**
+- **Remove** a tag = -3 weight (strong negative signal).
+- **Accept** a collective tag (save without removing) = +1 weight.
+- **Add** a tag manually = +1 weight.
+- Net feedback > +5 → boost consensus confidence. Net < -5 → reduce. Below 0.4 → delete.
+- Feedback pruned after 90 days.
+
+**Tag Aliases:**
+- ~33 seed aliases normalize variant spellings: "ML" → "machine-learning", "k8s" → "kubernetes", "js" → "javascript".
+- Applied at save time in both the extension and Edge Function.
+
+**Anti-spam:**
+- Only users with 10+ saves contribute to consensus (prevents new accounts from polluting).
+- `profiles.save_count` refreshed daily by Edge Function.
+
+**Data flow:**
+```
+Daily cron (GitHub Actions)
+  → Edge Function
+    → update_profile_save_counts()     — refresh reputation
+    → aggregate_url_consensus()        — compute URL consensus
+    → aggregate_keyword_patterns()     — compute keyword patterns
+    → compute_feedback_adjustments()   — apply feedback signals
+    → prune old feedback (>90 days)
+```
 
 ---
 
@@ -358,15 +491,42 @@ For saves where Tier 1+2 produce low-confidence results:
 ## 10. Phased Roadmap
 
 ### Phase 1 — MVP (Weeks 1-4)
-- [ ] Chrome extension: save with screenshot, title, URL, note
-- [ ] Rule-based auto-tagging (domain map + keyword extraction)
-- [ ] Supabase backend: auth, database, screenshot storage
-- [ ] Web dashboard: grid view, search, edit, delete
-- [ ] Google sign-in
-- [ ] Keyboard shortcut to save
+- [x] Chrome extension: save with screenshot, title, URL, note
+- [x] Rule-based auto-tagging (domain map + keyword extraction)
+- [x] 3-layer taxonomy: Category + Domain Context + Topics
+- [x] Supabase backend: auth, database, screenshot storage
+- [x] Web dashboard: grid view, search, edit, delete
+- [x] Google sign-in
+- [x] Keyboard shortcut to save
 
-### Phase 2 — Intelligence (Weeks 5-8)
-- [ ] Chrome AI / Gemini-powered tagging
+### AI Tagging Phase 1 — Structured Taxonomy (Complete)
+- [x] Domain map (~160 domains) with structured metadata
+- [x] Path-based category overrides
+- [x] JSON-LD type detection
+- [x] Multi-source keyword extraction (title, meta, headings, article tags)
+- [x] Removable topic tags in popup UI
+
+### AI Tagging Phase 2 — Domain Intelligence (Complete)
+- [x] `domain_intelligence` table with learned domain/path patterns
+- [x] SQL aggregation functions (`aggregate_domain_stats`, `aggregate_path_patterns`)
+- [x] Edge Function for daily aggregation (GitHub Actions cron, 2am UTC)
+- [x] Extension-side caching with hourly refresh
+- [x] Path pattern matching for topic inference
+- [x] Seed data for 155+ domains
+
+### AI Tagging Phase 3 — Collective Intelligence (Complete)
+- [x] URL consensus tags (cross-user agreement on same URL)
+- [x] Keyword-tag patterns (title words → tags across domains)
+- [x] Tag feedback loop (remove=-3, accept=+1, add=+1)
+- [x] Tag alias normalization (~33 seed aliases)
+- [x] Anti-spam: 10+ saves required to contribute to consensus
+- [x] Blue dashed-border community tags in popup UI
+- [x] Suggested tags (dimmed) for lower confidence
+- [x] Feedback-based confidence adjustments in Edge Function
+- [x] 90-day feedback pruning
+
+### Phase 2 — Dashboard & Polish (Weeks 5-8)
+- [ ] Chrome AI / Gemini-powered tagging (Tier 2 + 3)
 - [ ] Full-text search with Postgres `tsvector`
 - [ ] List view and grouped view
 - [ ] Bulk operations (delete, tag, re-categorize)
@@ -453,7 +613,7 @@ For saves where Tier 1+2 produce low-confidence results:
    Recommendation: Viewport only for MVP (simpler, smaller, faster). Full-page as Phase 2 option.
 
 2. **Should tags be global or per-user?**
-   Recommendation: Per-user. Avoids tag pollution. Can surface "popular tags" later from aggregate data.
+   Decision: Per-user. Avoids tag pollution. Collective intelligence (Phase 3) now surfaces "consensus tags" from aggregate cross-user data without sharing individual tags.
 
 3. **How to handle sites that block screenshots (e.g., banking)?**
    Recommendation: Gracefully skip screenshot, save metadata only. Show a placeholder card.
