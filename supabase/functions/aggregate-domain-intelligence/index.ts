@@ -27,9 +27,9 @@ function computeConfidence(sampleCount: number): number {
 }
 
 serve(async (req: Request) => {
-  // Validate API key
-  const authHeader = req.headers.get("Authorization");
-  if (!AGGREGATION_API_KEY || authHeader !== `Bearer ${AGGREGATION_API_KEY}`) {
+  // Validate API key (passed via x-api-key header; Authorization is used by Supabase gateway)
+  const apiKey = req.headers.get("x-api-key");
+  if (!AGGREGATION_API_KEY || apiKey !== AGGREGATION_API_KEY) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
