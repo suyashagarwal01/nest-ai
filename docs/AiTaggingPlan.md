@@ -123,30 +123,51 @@ Tags below 0.5 not shown. Tags 0.5-0.7 shown as "suggested" (dimmed). Tags >0.7 
 
 ---
 
-## Phase 4: Personal Learning + Polish (Weeks 7-8)
+## Phase 4: Personal Learning + Polish (Weeks 7-8) — Core Complete
 
 ### Goal
 Each user builds a personal tagging profile. The system adapts to their vocabulary and interests.
 
 ### Changes
 
-#### 4a. Tag vocabulary learning
-- Track which tags a user frequently applies
-- When AI suggests "ML" but user always uses "machine-learning" → auto-map to their preferred vocabulary
-- Stored as a lightweight vocabulary map in `profiles` table (JSONB)
+#### 4a. Tag vocabulary learning — Implemented
+- User removes auto-tag "ml" and adds "machine-learning" → system learns `{"ml": "machine-learning"}`
+- Vocabulary stored as JSONB in `profiles.tag_vocabulary`
+- Extension caches vocabulary in `chrome.storage.local` (1h TTL, hourly refresh via Chrome alarm)
+- Applied after Tier 1 tagging: topics are mapped through user's vocabulary before saving
+- Learning happens in service worker's `saveBookmark()` — detects removed/added tag pairs as renames
+- Settings page on web dashboard provides manual CRUD editor for vocabulary rules
 
-#### 4b. Interest-aware boosting
-- User saves lots of "React" content → when saving a JS framework page, boost React ecosystem tags over Vue/Angular
-- Lightweight user profile vector derived from tag frequency
+**Key files:**
+- `extension/src/lib/user-preferences.ts` — cache, apply, learn vocabulary
+- `web/src/components/tag-vocabulary-editor.tsx` — manual editor
+- `web/src/app/settings/page.tsx` — Tag Preferences section
 
-#### 4c. Smart suggestions
-- "You saved 4 articles about `Next.js App Router` this week — create a collection?"
-- Surfaced on the dashboard, not the extension (keep extension fast)
+#### 4b. Interest-aware boosting — Implemented
+- `profiles.interest_vector` stores top 50 tag frequency counts: `{"react": 15, "typescript": 12}`
+- Computed daily by Edge Function (step 11 in `aggregate-domain-intelligence`) via `compute_interest_vectors()` SQL function
+- During Tier 1 tagging: candidate topics scored with logarithmic interest boost, reordered before cap at 5
+- Does NOT add new topics — only reorders existing candidates to prefer user's historical interests
 
-#### 4d. Dashboard enhancements
-- "Tag health" view: coverage stats, most-used tags, tag trends over time
-- Category breakdown pie chart
-- Domain source analytics
+**Key files:**
+- `extension/src/lib/interest-vector.ts` — cache + boost scoring
+- `supabase/migrations/008_user_preferences.sql` — schema + SQL function
+
+#### 4c. Smart suggestions — Implemented
+- **Tag cluster detection:** 3+ bookmarks saved in last 7 days share a tag → suggest "Create a [tag] collection?"
+- **Large tag groups:** 15+ bookmarks with same tag, no matching collection → suggest creating one
+- Max 3 suggestions shown, dismissible (stored in localStorage with weekly reset)
+- Creating a collection from a suggestion auto-adds all matching bookmarks
+
+**Key files:**
+- `web/src/lib/suggestions.ts` — `computeSuggestions()` pure function
+- `web/src/components/suggestion-banner.tsx` — dismissible banner with action button
+- `web/src/app/page.tsx` — renders banners above bookmark grid
+
+#### 4d. Dashboard enhancements — Not Yet Implemented
+- [ ] "Tag health" view: coverage stats, most-used tags, tag trends over time
+- [ ] Category breakdown pie chart
+- [ ] Domain source analytics
 
 ### Success Metrics
 - Vocabulary match rate > 90% (system uses user's preferred terms)
@@ -172,12 +193,12 @@ The entire system runs on free tiers. The most powerful tagging comes from users
 ## Data Model Changes Summary
 
 ```sql
--- Phase 1
+-- Phase 1 (migration 002)
 ALTER TABLE bookmarks ADD COLUMN domain_context TEXT;
 ALTER TABLE bookmark_tags ADD COLUMN source TEXT DEFAULT 'ai_tier1';
 ALTER TABLE bookmark_tags ADD COLUMN confidence FLOAT DEFAULT 1.0;
 
--- Phase 2
+-- Phase 2 (migration 003-004)
 CREATE TABLE domain_intelligence (
   domain TEXT PRIMARY KEY,
   domain_type TEXT,
@@ -188,18 +209,26 @@ CREATE TABLE domain_intelligence (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Phase 3
-CREATE MATERIALIZED VIEW tag_patterns AS
-SELECT domain, path_pattern, tag_name,
-  COUNT(DISTINCT user_id) as user_count,
-  COUNT(*) as apply_count
-FROM bookmarks b
-JOIN bookmark_tags bt ON b.id = bt.bookmark_id
-JOIN tags t ON bt.tag_id = t.id
-GROUP BY domain, path_pattern, tag_name
-HAVING COUNT(DISTINCT user_id) >= 3;
+-- Phase 3 (migration 005)
+-- Uses url_tag_consensus, keyword_tag_patterns, tag_feedback, tag_aliases tables
+-- (see PRD section 7 for full schema)
 
--- Phase 4
+-- Phase 4 (migration 008)
 ALTER TABLE profiles ADD COLUMN tag_vocabulary JSONB DEFAULT '{}';
 ALTER TABLE profiles ADD COLUMN interest_vector JSONB DEFAULT '{}';
+
+-- compute_interest_vectors() SQL function returns top 50 tags per user
+-- Called daily by Edge Function, results stored in profiles.interest_vector
 ```
+
+## Implementation Status
+
+| Phase | Status | Migrations |
+|-------|--------|------------|
+| Phase 1: Structured Taxonomy | Complete | 002 |
+| Phase 2: Domain Intelligence | Complete | 003, 004 |
+| Phase 3: Collective Intelligence | Complete | 005 |
+| Phase 4a: Tag Vocabulary | Complete | 008 |
+| Phase 4b: Interest Boosting | Complete | 008 |
+| Phase 4c: Smart Suggestions | Complete | (client-side only) |
+| Phase 4d: Dashboard Analytics | Not started | — |

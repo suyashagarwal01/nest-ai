@@ -1,9 +1,9 @@
 # PRD: inSpace — Smart Bookmarking Chrome Extension
 
-**Version:** 1.4
+**Version:** 1.5
 **Author:** Product Lead
 **Date:** March 4, 2026
-**Status:** Active — Phase 2 Complete
+**Status:** Active — Phase 4 (Partial) Complete
 
 ---
 
@@ -218,6 +218,8 @@ User opens dashboard → Selects multiple items via checkbox
 │  │ Email    │  │  tags            │  │  JPEG images      │  │
 │  │          │  │  bookmark_tags   │  │  Thumbnails       │  │
 │  │          │  │  profiles        │  │                   │  │
+│  │          │  │  collections     │  │                   │  │
+│  │          │  │  api_keys        │  │                   │  │
 │  │          │  │  domain_intel    │  │                   │  │
 │  │          │  │  url_consensus   │  │                   │  │
 │  │          │  │  keyword_patt    │  │                   │  │
@@ -229,6 +231,7 @@ User opens dashboard → Selects multiple items via checkbox
 │  │  - Domain intelligence aggregation (daily cron)      │    │
 │  │  - Collective intelligence aggregation (daily cron)  │    │
 │  │  - Feedback-based confidence adjustments             │    │
+│  │  - Interest vector computation (daily)              │    │
 │  │  - gemini-tagger (Gemini 2.5 Flash Lite, 14 RPM)     │    │
 │  └──────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────┘
@@ -241,7 +244,12 @@ User opens dashboard → Selects multiple items via checkbox
 │              │  │ - Grid/List/Group views         │
 │ Daily cron   │  │ - Search & filter               │
 │ → triggers   │  │ - Edit/Delete                   │
-│ Edge Fn      │  │ - Responsive (mobile-friendly)  │
+│ Edge Fn      │  │ - Collections & sharing          │
+│              │  │ - Settings (API keys, vocab)     │
+│              │  │ - Smart suggestions              │
+│              │  │ - Related bookmarks              │
+│              │  │ - REST API (/api/v1/)            │
+│              │  │ - Responsive (mobile-friendly)  │
 └──────────────┘  └──────────────────────────────┘
 ```
 
@@ -347,6 +355,52 @@ CREATE TABLE tag_aliases (
   canonical TEXT NOT NULL,           -- e.g. "machine-learning", "kubernetes", "javascript"
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Collections (Phase 3)
+CREATE TABLE collections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  slug TEXT UNIQUE,                  -- public sharing URL (/c/:slug)
+  is_public BOOLEAN DEFAULT false,
+  cover_url TEXT,
+  bookmark_count INTEGER DEFAULT 0,  -- maintained by trigger
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE collection_bookmarks (
+  collection_id UUID REFERENCES collections(id) ON DELETE CASCADE,
+  bookmark_id UUID REFERENCES bookmarks(id) ON DELETE CASCADE,
+  sort_order INTEGER DEFAULT 0,
+  added_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (collection_id, bookmark_id)
+);
+
+CREATE TABLE collection_members (
+  collection_id UUID REFERENCES collections(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  role TEXT CHECK (role IN ('viewer', 'editor')),
+  invited_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (collection_id, user_id)
+);
+
+-- API Keys (Phase 4)
+CREATE TABLE api_keys (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  key_hash TEXT NOT NULL,            -- SHA-256 hash of raw key
+  key_prefix TEXT NOT NULL,          -- first 8 chars for display
+  name TEXT NOT NULL DEFAULT 'Default',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  last_used_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ
+);
+
+-- User Preferences (Phase 4)
+-- profiles.tag_vocabulary JSONB DEFAULT '{}'   — user-specific alias overrides
+-- profiles.interest_vector JSONB DEFAULT '{}'  — top 50 tag frequency counts
 ```
 
 ### Row Level Security (RLS)
@@ -536,24 +590,29 @@ Daily cron (GitHub Actions)
 - [x] Duplicate detection with "Already saved — update?" prompt
 - [x] Offline save queue with background sync (5-min alarm retry, badge count)
 - [x] Chrome AI / Gemini-powered tagging (Tier 2 + 3)
-- [ ] Bulk operations (delete, tag, re-categorize) — deferred to Phase 3
+- [ ] Bulk operations (delete, tag, re-categorize) — deferred
 
-### Phase 3 — Scale & Sharing (Weeks 9-16)
-- [ ] Public collections: share a curated set of bookmarks via link
-- [ ] Collection folders / boards for manual organization
-- [ ] Import from browser bookmarks, Pocket, Raindrop.io
-- [ ] Firefox extension
-- [ ] Safari extension (WebExtension API)
-- [ ] Mobile-responsive PWA for the dashboard
-- [ ] Collaborative collections (invite others to add/view)
+### Phase 3 — Collections, Sharing, Import, PWA (Complete)
+- [x] Public collections: share a curated set of bookmarks via link (`/c/:slug`)
+- [x] Collection folders for manual organization
+- [x] Import from browser bookmarks, Pocket, Raindrop.io (3 parsers)
+- [x] Mobile-responsive PWA for the dashboard (manifest, service worker, register)
+- [x] Collaborative collections with role-based access (viewer/editor)
+- [ ] Firefox extension — deferred
+- [ ] Safari extension — deferred
 
-### Phase 4 — Intelligence V2 (Future)
+### Phase 4 — Intelligence V2 & API (Partial — Core Complete)
+- [x] API for third-party integrations (REST API with key auth, rate limiting, server-side tagger)
+- [x] Settings page (API key management + tag vocabulary editor)
+- [x] Tag vocabulary learning (user-specific alias overrides, auto-learned from tag renames)
+- [x] Interest-aware topic boosting (reorders candidates by historical tag frequency)
+- [x] Related/similar saves suggestions (shared-tag RPC, expandable panel on bookmark cards)
+- [x] Smart collection suggestions (recent tag clusters + large tag groups, dismissible banners)
 - [ ] Semantic search: "find that article about React performance I saved last month"
 - [ ] Auto-summarization of saved pages (one-line summary on each card)
-- [ ] Related/similar saves suggestions
 - [ ] Daily/weekly digest email of your saves
 - [ ] Browser history integration (retroactive save suggestions)
-- [ ] API for third-party integrations
+- [ ] Dashboard analytics (tag health view, category breakdown, domain stats)
 
 ---
 
