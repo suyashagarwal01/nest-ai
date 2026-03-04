@@ -19,6 +19,63 @@ function getPageMeta(): PageMeta {
   ) as HTMLLinkElement | null;
   const favicon = faviconEl?.href ?? `${location.origin}/favicon.ico`;
 
+  // Meta keywords
+  let metaKeywords: string[] = [];
+  try {
+    const raw = getMeta("keywords");
+    if (raw) {
+      metaKeywords = raw
+        .split(",")
+        .map((k) => k.trim().toLowerCase())
+        .filter((k) => k.length > 0);
+    }
+  } catch {
+    // ignore malformed
+  }
+
+  // Article tags (Open Graph article:tag)
+  let articleTags: string[] = [];
+  try {
+    const tagEls = document.querySelectorAll('meta[property="article:tag"]');
+    tagEls.forEach((el) => {
+      const val = el.getAttribute("content")?.trim().toLowerCase();
+      if (val) articleTags.push(val);
+    });
+  } catch {
+    // ignore
+  }
+
+  // JSON-LD @type
+  let jsonLdType: string | null = null;
+  try {
+    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    for (const script of scripts) {
+      const text = script.textContent;
+      if (!text) continue;
+      const data = JSON.parse(text);
+      // Handle both single object and array
+      const obj = Array.isArray(data) ? data[0] : data;
+      if (obj?.["@type"]) {
+        jsonLdType = Array.isArray(obj["@type"]) ? obj["@type"][0] : obj["@type"];
+        break;
+      }
+    }
+  } catch {
+    // ignore malformed JSON-LD
+  }
+
+  // First 5 h1 + h2 headings
+  let headings: string[] = [];
+  try {
+    const els = document.querySelectorAll("h1, h2");
+    for (let i = 0; i < Math.min(els.length, 5); i++) {
+      const text = els[i].textContent?.trim();
+      if (text) headings.push(text);
+    }
+  } catch {
+    // ignore
+  }
+
   return {
     url: location.href,
     title: document.title,
@@ -28,6 +85,10 @@ function getPageMeta(): PageMeta {
       getMeta("twitter:description"),
     favicon,
     ogImage: getMeta("og:image") || getMeta("twitter:image"),
+    metaKeywords,
+    articleTags,
+    jsonLdType,
+    headings,
   };
 }
 

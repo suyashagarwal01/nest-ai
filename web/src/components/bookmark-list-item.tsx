@@ -118,10 +118,20 @@ export function BookmarkListItem({
               <span className="text-xs text-neutral-400 shrink-0">
                 {timeAgo}
               </span>
-              {tags.length > 0 && (
+              {(bookmark.category || bookmark.domain_context || tags.length > 0) && (
                 <>
                   <span className="text-xs text-neutral-300">·</span>
-                  <div className="flex gap-1 overflow-hidden">
+                  <div className="flex items-center gap-1 overflow-hidden">
+                    {bookmark.category && bookmark.category !== "Other" && (
+                      <span className="px-1.5 py-0 bg-neutral-900 text-white text-[10px] rounded-full shrink-0 font-medium">
+                        {bookmark.category}
+                      </span>
+                    )}
+                    {bookmark.domain_context && (
+                      <span className="px-1.5 py-0 bg-neutral-200 text-neutral-700 text-[10px] rounded-full shrink-0 font-medium">
+                        {bookmark.domain_context}
+                      </span>
+                    )}
                     {tags.slice(0, 3).map((tag) => (
                       <span
                         key={tag.id}

@@ -22,7 +22,7 @@ const inputTitle = document.getElementById("input-title") as HTMLInputElement;
 const displayUrl = document.getElementById("display-url") as HTMLSpanElement;
 const favicon = document.getElementById("favicon") as HTMLImageElement;
 const tagsPreview = document.getElementById("tags-preview") as HTMLDivElement;
-const inputNote = document.getElementById("input-note") as HTMLTextAreaElement;
+const inputUserTags = document.getElementById("input-user-tags") as HTMLInputElement;
 const toggleScreenshot = document.getElementById("toggle-screenshot") as HTMLInputElement;
 const screenshotPreview = document.getElementById("screenshot-preview") as HTMLDivElement;
 const screenshotImg = document.getElementById("screenshot-img") as HTMLImageElement;
@@ -203,6 +203,10 @@ async function initSaveView() {
       description: "",
       favicon: tab?.favIconUrl ?? "",
       ogImage: "",
+      metaKeywords: [],
+      articleTags: [],
+      jsonLdType: null,
+      headings: [],
     };
   }
 
@@ -212,11 +216,17 @@ async function initSaveView() {
   favicon.src = currentMeta.favicon;
   favicon.onerror = () => { favicon.style.display = "none"; };
 
-  // Generate tags and show preview
+  // Generate tags and show preview (3-layer taxonomy)
   const tagResult = generateTags(currentMeta);
-  tagsPreview.innerHTML = tagResult.tags
+  let tagsHtml = "";
+  tagsHtml += `<span class="tag tag-category">${tagResult.category}</span>`;
+  if (tagResult.domainContext) {
+    tagsHtml += `<span class="tag tag-domain">${tagResult.domainContext}</span>`;
+  }
+  tagsHtml += tagResult.topics
     .map((t) => `<span class="tag">${t}</span>`)
     .join("");
+  tagsPreview.innerHTML = tagsHtml;
 
   // Capture screenshot preview
   currentScreenshotUrl = await captureScreenshotPreview();
@@ -252,12 +262,18 @@ btnSave.addEventListener("click", async () => {
 
   try {
     // Send save to background service worker
+    // Parse comma-separated user tags
+    const userTags = inputUserTags.value
+      .split(",")
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t.length > 0);
+
     const response = await chrome.runtime.sendMessage({
       type: "SAVE_BOOKMARK",
       data: {
         url: currentMeta.url,
         title: inputTitle.value,
-        note: inputNote.value,
+        userTags,
         captureScreenshot: toggleScreenshot.checked,
         meta: currentMeta,
       },

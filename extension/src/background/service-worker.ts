@@ -1,11 +1,18 @@
 import { getSupabase } from "../lib/supabase";
 import { generateTags } from "../lib/tagger";
+import { initCache, setupCacheRefresh } from "../lib/domain-intelligence";
 import type { ExtensionMessage, SavePayload } from "../lib/types";
 
 /**
  * Background service worker.
  * Handles: screenshot capture, bookmark saving, tag generation, Supabase sync.
  */
+
+// Initialize domain intelligence cache on service worker startup
+initCache().catch((err) =>
+  console.warn("Domain intelligence init failed:", err)
+);
+setupCacheRefresh();
 
 // ---------- Screenshot capture ----------
 
@@ -100,9 +107,9 @@ async function saveBookmark(payload: SavePayload): Promise<void> {
         url: payload.url,
         title: payload.title,
         description: payload.meta.description || null,
-        note: payload.note || null,
         favicon_url: payload.meta.favicon || null,
         category: tagResult.category,
+        domain_context: tagResult.domainContext || null,
         has_screenshot: !!screenshotDataUrl,
       },
       { onConflict: "user_id,url" }
@@ -132,9 +139,8 @@ async function saveBookmark(payload: SavePayload): Promise<void> {
     }
   }
 
-  // Create/link tags
-  for (const tagName of tagResult.tags) {
-    // Upsert tag
+  // Create/link AI tags (topics from 3-layer taxonomy)
+  for (const tagName of tagResult.topics) {
     const { data: tag } = await supabase
       .from("tags")
       .upsert(
@@ -145,11 +151,42 @@ async function saveBookmark(payload: SavePayload): Promise<void> {
       .single();
 
     if (tag) {
-      // Link tag to bookmark (ignore duplicates)
       await supabase
         .from("bookmark_tags")
         .upsert(
-          { bookmark_id: bookmark.id, tag_id: tag.id },
+          {
+            bookmark_id: bookmark.id,
+            tag_id: tag.id,
+            source: "ai_tier1",
+            confidence: tagResult.confidence,
+          },
+          { onConflict: "bookmark_id,tag_id" }
+        )
+        .select();
+    }
+  }
+
+  // Create/link user-added tags
+  for (const tagName of payload.userTags) {
+    const { data: tag } = await supabase
+      .from("tags")
+      .upsert(
+        { user_id: user.id, name: tagName },
+        { onConflict: "user_id,name" }
+      )
+      .select()
+      .single();
+
+    if (tag) {
+      await supabase
+        .from("bookmark_tags")
+        .upsert(
+          {
+            bookmark_id: bookmark.id,
+            tag_id: tag.id,
+            source: "user",
+            confidence: 1.0,
+          },
           { onConflict: "bookmark_id,tag_id" }
         )
         .select();
@@ -198,7 +235,7 @@ chrome.commands.onCommand.addListener(async (command) => {
         await saveBookmark({
           url: meta.data.url,
           title: meta.data.title,
-          note: "",
+          userTags: [],
           captureScreenshot: true,
           meta: meta.data,
         });

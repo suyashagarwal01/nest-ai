@@ -1,0 +1,16 @@
+name: Aggregate Domain Intelligence
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # daily at 2am UTC
+  workflow_dispatch:        # manual trigger
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger aggregation Edge Function
+        run: |
+          curl -sS -f -X POST \
+            -H "Authorization: Bearer ${{ secrets.AGGREGATION_API_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/aggregate-domain-intelligence"

@@ -320,6 +320,28 @@ body {
   line-height: 18px;
 }
 
+.tag-category {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.tag-domain {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+  border: 1px solid var(--color-border);
+}
+
+.tag-separator {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-tag);
+  line-height: 18px;
+  padding: 0 2px;
+}
+
 /* ─── Toggle ────────────────────────────────────────────── */
 .toggle-row {
   display: flex;

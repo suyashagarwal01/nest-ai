@@ -189,9 +189,22 @@ export function BookmarkCard({ bookmark, onDelete, onUpdate }: BookmarkCardProps
               </p>
             )}
 
-            {/* Tags */}
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-3">
+            {/* Tags — 3-layer taxonomy */}
+            {(bookmark.category || bookmark.domain_context || tags.length > 0) && (
+              <div className="flex flex-wrap items-center gap-1 mt-3">
+                {bookmark.category && bookmark.category !== "Other" && (
+                  <span className="px-2 py-0.5 bg-neutral-900 text-white text-[11px] rounded-full font-medium">
+                    {bookmark.category}
+                  </span>
+                )}
+                {bookmark.domain_context && (
+                  <span className="px-2 py-0.5 bg-neutral-200 text-neutral-700 text-[11px] rounded-full font-medium">
+                    {bookmark.domain_context}
+                  </span>
+                )}
+                {(bookmark.category || bookmark.domain_context) && tags.length > 0 && (
+                  <span className="text-neutral-300 text-[11px]">&middot;</span>
+                )}
                 {tags.map((tag) => (
                   <span
                     key={tag.id}

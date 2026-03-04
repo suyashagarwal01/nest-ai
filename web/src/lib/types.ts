@@ -9,6 +9,7 @@ export interface Bookmark {
   thumbnail_url: string | null;
   favicon_url: string | null;
   domain: string | null;
+  domain_context: string | null;
   category: string | null;
   has_screenshot: boolean;
   created_at: string;
@@ -24,5 +25,5 @@ export interface Tag {
 }
 
 export interface BookmarkWithTags extends Bookmark {
-  bookmark_tags: { tag_id: string; tags: Tag }[];
+  bookmark_tags: { tag_id: string; source?: string; confidence?: number; tags: Tag }[];
 }
