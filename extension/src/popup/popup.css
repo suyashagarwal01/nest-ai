@@ -465,6 +465,20 @@ body {
   display: none;
 }
 
+.save-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-error);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  line-height: 18px;
+}
+
+.save-error svg {
+  flex-shrink: 0;
+}
+
 /* ─── Success ───────────────────────────────────────────── */
 .success-container {
   display: flex;

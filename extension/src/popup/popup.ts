@@ -281,10 +281,15 @@ toggleScreenshot.addEventListener("change", () => {
 
 // ─── Save ────────────────────────────────────────────────────
 
+function showSaveError(message: string) {
+  saveStatus.innerHTML = `<span class="save-error"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>${message}</span>`;
+}
+
 btnSave.addEventListener("click", async () => {
   if (!currentMeta) return;
 
   btnSave.disabled = true;
+  saveStatus.innerHTML = "";
   saveStatus.textContent = "Saving...";
 
   try {
@@ -310,11 +315,11 @@ btnSave.addEventListener("click", async () => {
     if (response?.success) {
       showView("success");
     } else {
-      saveStatus.textContent = response?.error ?? "Failed to save.";
+      showSaveError(response?.error ?? "Failed to save.");
       btnSave.disabled = false;
     }
   } catch (err) {
-    saveStatus.textContent = err instanceof Error ? err.message : "Failed to save.";
+    showSaveError(err instanceof Error ? err.message : "Failed to save.");
     btnSave.disabled = false;
   }
 });
