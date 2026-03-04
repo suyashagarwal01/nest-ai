@@ -1,24 +1,33 @@
 "use client";
 
-import { Search, X } from "lucide-react";
+import { Search, X, Loader2 } from "lucide-react";
 
 interface SearchBarProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  loading?: boolean;
 }
 
 export function SearchBar({
   value,
   onChange,
   placeholder = "Search bookmarks...",
+  loading,
 }: SearchBarProps) {
   return (
     <div className="relative">
-      <Search
-        size={16}
-        className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
-      />
+      {loading ? (
+        <Loader2
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 animate-spin"
+        />
+      ) : (
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
+        />
+      )}
       <input
         type="text"
         value={value}

@@ -22,9 +22,12 @@ export default function DashboardPage() {
 
   // Filters
   const [search, setSearch] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<BookmarkRow[] | null>(null);
+  const [userId, setUserId] = useState<string>();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [view, setView] = useState<"grid" | "list">("grid");
+  const [view, setView] = useState<"grid" | "list" | "grouped">("grid");
 
   // Fetch bookmarks with tags
   const fetchBookmarks = useCallback(async () => {
@@ -44,9 +47,69 @@ export default function DashboardPage() {
       await fetchBookmarks();
       const { data: { user } } = await supabase.auth.getUser();
       setUserEmail(user?.email ?? undefined);
+      setUserId(user?.id);
     };
     init();
   }, [fetchBookmarks, supabase.auth]);
+
+  // Debounced server-side FTS search
+  useEffect(() => {
+    const query = search.trim();
+    if (!query || !userId) {
+      // Clear results after debounce to avoid synchronous setState in effect body
+      const timer = setTimeout(() => {
+        setSearchResults(null);
+        setSearching(false);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      async function runSearch() {
+        setSearching(true);
+        const { data } = await supabase.rpc("search_bookmarks", {
+          search_query: query,
+          user_id_param: userId,
+        });
+        if (cancelled) return;
+
+        if (data && data.length > 0) {
+          const ids = data.map((b: Bookmark) => b.id);
+          const { data: tagsData } = await supabase
+            .from("bookmark_tags")
+            .select("bookmark_id, tags(*)")
+            .in("bookmark_id", ids);
+
+          if (cancelled) return;
+
+          const tagsByBookmark = new Map<string, { tags: Tag }[]>();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          tagsData?.forEach((bt: any) => {
+            const existing = tagsByBookmark.get(bt.bookmark_id as string) || [];
+            existing.push({ tags: bt.tags as Tag });
+            tagsByBookmark.set(bt.bookmark_id as string, existing);
+          });
+
+          setSearchResults(
+            data.map((b: Bookmark) => ({
+              ...b,
+              bookmark_tags: tagsByBookmark.get(b.id) || [],
+            }))
+          );
+        } else {
+          setSearchResults(data ? [] : null);
+        }
+        setSearching(false);
+      }
+      runSearch();
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [search, userId, supabase]);
 
   // Derived data
   const allCategories = useMemo(() => {
@@ -67,9 +130,9 @@ export default function DashboardPage() {
     return Array.from(tagSet).sort();
   }, [bookmarks]);
 
-  // Filtered bookmarks
+  // Filtered bookmarks — use server search results when searching, else full list
   const filtered = useMemo(() => {
-    let result = bookmarks;
+    let result = searchResults !== null ? searchResults : bookmarks;
 
     // Category filter
     if (selectedCategory) {
@@ -85,24 +148,76 @@ export default function DashboardPage() {
       });
     }
 
-    // Search filter (client-side for instant feel)
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (b) =>
-          b.title?.toLowerCase().includes(q) ||
-          b.url.toLowerCase().includes(q) ||
-          b.domain?.toLowerCase().includes(q) ||
-          b.note?.toLowerCase().includes(q) ||
-          b.description?.toLowerCase().includes(q) ||
-          b.bookmark_tags?.some((bt) =>
-            bt.tags?.name?.toLowerCase().includes(q)
-          )
+    return result;
+  }, [bookmarks, searchResults, selectedCategory, selectedTags]);
+
+  // Group filtered bookmarks by category
+  const groupedByCategory = useMemo(() => {
+    const groups = new Map<string, BookmarkRow[]>();
+    filtered.forEach((b) => {
+      const cat = b.category || "Other";
+      const list = groups.get(cat) || [];
+      list.push(b);
+      groups.set(cat, list);
+    });
+    // Sort alphabetically, "Other" last
+    return new Map(
+      [...groups.entries()].sort(([a], [b]) => {
+        if (a === "Other") return 1;
+        if (b === "Other") return -1;
+        return a.localeCompare(b);
+      })
+    );
+  }, [filtered]);
+
+  function handleExport(format: "json" | "csv") {
+    const data = bookmarks.map((b) => ({
+      url: b.url,
+      title: b.title ?? "",
+      category: b.category ?? "",
+      domain: b.domain ?? "",
+      domain_context: b.domain_context ?? "",
+      tags: b.bookmark_tags?.map((bt) => bt.tags?.name).filter(Boolean).join(", ") ?? "",
+      note: b.note ?? "",
+      created_at: b.created_at,
+    }));
+
+    let blob: Blob;
+    let filename: string;
+
+    if (format === "json") {
+      blob = new Blob(
+        [JSON.stringify({ bookmarks: data }, null, 2)],
+        { type: "application/json" }
       );
+      filename = "inspace-bookmarks.json";
+    } else {
+      const columns = ["URL", "Title", "Category", "Domain", "Domain Context", "Tags", "Note", "Created At"];
+      const escape = (v: string) => {
+        if (v.includes(",") || v.includes('"') || v.includes("\n")) {
+          return `"${v.replace(/"/g, '""')}"`;
+        }
+        return v;
+      };
+      const rows = data.map((d) =>
+        [d.url, d.title, d.category, d.domain, d.domain_context, d.tags, d.note, d.created_at]
+          .map(escape)
+          .join(",")
+      );
+      blob = new Blob(
+        [columns.join(",") + "\n" + rows.join("\n")],
+        { type: "text/csv" }
+      );
+      filename = "inspace-bookmarks.csv";
     }
 
-    return result;
-  }, [bookmarks, selectedCategory, selectedTags, search]);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function handleDelete(id: string) {
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
@@ -124,12 +239,12 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <Header view={view} onViewChange={setView} userEmail={userEmail} />
+      <Header view={view} onViewChange={setView} onExport={handleExport} userEmail={userEmail} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Search + filters */}
         <div className="flex flex-col gap-4 mb-6">
-          <SearchBar value={search} onChange={setSearch} />
+          <SearchBar value={search} onChange={setSearch} loading={searching} />
           <CategoryTabs
             categories={allCategories}
             selected={selectedCategory}
@@ -188,6 +303,32 @@ export default function DashboardPage() {
                 onDelete={handleDelete}
                 onUpdate={handleUpdate}
               />
+            ))}
+          </div>
+        )}
+
+        {/* Grouped view */}
+        {!loading && filtered.length > 0 && view === "grouped" && (
+          <div className="space-y-8">
+            {[...groupedByCategory.entries()].map(([category, items]) => (
+              <section key={category}>
+                <h2 className="text-sm font-semibold text-neutral-700 mb-3">
+                  {category}{" "}
+                  <span className="text-neutral-400 font-normal">
+                    ({items.length})
+                  </span>
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {items.map((bookmark) => (
+                    <BookmarkCard
+                      key={bookmark.id}
+                      bookmark={bookmark}
+                      onDelete={handleDelete}
+                      onUpdate={handleUpdate}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}

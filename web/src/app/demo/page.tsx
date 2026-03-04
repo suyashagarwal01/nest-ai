@@ -201,7 +201,7 @@ export default function DemoPage() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [view, setView] = useState<"grid" | "list">("grid");
+  const [view, setView] = useState<"grid" | "list" | "grouped">("grid");
 
   const allCategories = useMemo(() => {
     const cats = new Set<string>();
@@ -260,7 +260,7 @@ export default function DemoPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <Header view={view} onViewChange={setView} userEmail="demo@inspace.app" />
+      <Header view={view} onViewChange={setView} onExport={() => {}} userEmail="demo@inspace.app" />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex flex-col gap-4 mb-6">
