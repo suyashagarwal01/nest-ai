@@ -10,6 +10,8 @@ import { TagFilter } from "@/components/tag-filter";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { BookmarkListItem } from "@/components/bookmark-list-item";
 import { EmptyState } from "@/components/empty-state";
+import { SuggestionBanner } from "@/components/suggestion-banner";
+import { computeSuggestions, dismissSuggestion } from "@/lib/suggestions";
 
 type BookmarkRow = Bookmark & { bookmark_tags: { tags: Tag }[] };
 
@@ -28,6 +30,8 @@ export default function DashboardPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [view, setView] = useState<"grid" | "list" | "grouped">("grid");
+  const [collections, setCollections] = useState<{ id: string; name: string }[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
   // Fetch bookmarks with tags
   const fetchBookmarks = useCallback(async () => {
@@ -48,6 +52,12 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser();
       setUserEmail(user?.email ?? undefined);
       setUserId(user?.id);
+
+      // Fetch lightweight collection list for suggestions
+      const { data: colls } = await supabase
+        .from("collections")
+        .select("id, name");
+      if (colls) setCollections(colls);
     };
     init();
   }, [fetchBookmarks, supabase.auth]);
@@ -170,6 +180,46 @@ export default function DashboardPage() {
     );
   }, [filtered]);
 
+  // Compute suggestions (pure derivation from state)
+  const suggestions = useMemo(() => {
+    if (bookmarks.length === 0) return [];
+    return computeSuggestions(bookmarks, collections).filter(
+      (s) => !dismissedIds.has(s.id)
+    );
+  }, [bookmarks, collections, dismissedIds]);
+
+  function handleDismissSuggestion(id: string) {
+    dismissSuggestion(id);
+    setDismissedIds((prev) => new Set([...prev, id]));
+  }
+
+  async function handleCreateCollectionFromSuggestion(tag: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: collection, error } = await supabase
+      .from("collections")
+      .insert({ user_id: user.id, name: tag, description: `Bookmarks tagged "${tag}"` })
+      .select()
+      .single();
+
+    if (error || !collection) return;
+
+    // Add matching bookmarks to the collection
+    const matching = bookmarks.filter((b) =>
+      b.bookmark_tags?.some((bt) => bt.tags?.name === tag)
+    );
+    for (const b of matching) {
+      await supabase.from("collection_bookmarks").insert({
+        collection_id: collection.id,
+        bookmark_id: b.id,
+      });
+    }
+
+    // Update collections list (suggestions will recompute automatically)
+    setCollections((prev) => [...prev, { id: collection.id, name: tag }]);
+  }
+
   function handleExport(format: "json" | "csv") {
     const data = bookmarks.map((b) => ({
       url: b.url,
@@ -257,6 +307,20 @@ export default function DashboardPage() {
             onClear={() => setSelectedTags([])}
           />
         </div>
+
+        {/* Smart suggestions */}
+        {!loading && suggestions.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {suggestions.map((s) => (
+              <SuggestionBanner
+                key={s.id}
+                suggestion={s}
+                onDismiss={handleDismissSuggestion}
+                onCreate={handleCreateCollectionFromSuggestion}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Results count */}
         {!loading && bookmarks.length > 0 && (

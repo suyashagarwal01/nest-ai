@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { createSupabaseBrowser } from "@/lib/supabase-browser";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, LayoutGrid, List, Layers, Download, FolderOpen, Upload } from "lucide-react";
+import { LogOut, LayoutGrid, List, Layers, Download, FolderOpen, Upload, Settings } from "lucide-react";
 
 type ViewType = "grid" | "list" | "grouped";
 
@@ -63,6 +63,13 @@ export function Header({ view, onViewChange, onExport, userEmail }: HeaderProps)
               title="Import"
             >
               <Upload size={16} />
+            </Link>
+            <Link
+              href="/settings"
+              className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400"
+              title="Settings"
+            >
+              <Settings size={16} />
             </Link>
           </nav>
         </div>

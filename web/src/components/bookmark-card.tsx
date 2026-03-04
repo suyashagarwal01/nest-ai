@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Pencil, Trash2, X, Check, FolderPlus } from "lucide-react";
+import { Pencil, Trash2, X, Check, FolderPlus, Link2 } from "lucide-react";
 import type { Bookmark, Tag } from "@/lib/types";
 import { createSupabaseBrowser } from "@/lib/supabase-browser";
 import { CollectionPickerDropdown } from "@/components/collection-picker-dropdown";
+import { RelatedBookmarks } from "@/components/related-bookmarks";
 
 interface BookmarkCardProps {
   bookmark: Bookmark & { bookmark_tags?: { tags: Tag }[] };
@@ -21,6 +22,7 @@ export function BookmarkCard({ bookmark, onDelete, onUpdate, readOnly }: Bookmar
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showCollectionPicker, setShowCollectionPicker] = useState(false);
+  const [showRelated, setShowRelated] = useState(false);
 
   const supabase = createSupabaseBrowser();
   const tags =
@@ -153,6 +155,15 @@ export function BookmarkCard({ bookmark, onDelete, onUpdate, readOnly }: Bookmar
                     )}
                   </div>
                   <button
+                    onClick={() => setShowRelated((v) => !v)}
+                    className={`p-1.5 rounded-md hover:bg-neutral-100 cursor-pointer ${
+                      showRelated ? "text-neutral-900" : "text-neutral-400"
+                    }`}
+                    title="Related bookmarks"
+                  >
+                    <Link2 size={13} />
+                  </button>
+                  <button
                     onClick={() => setEditing(true)}
                     className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 cursor-pointer"
                     title="Edit"
@@ -233,6 +244,18 @@ export function BookmarkCard({ bookmark, onDelete, onUpdate, readOnly }: Bookmar
                     {tag.name}
                   </span>
                 ))}
+              </div>
+            )}
+
+            {/* Related bookmarks panel */}
+            {showRelated && (
+              <div className="mt-3 pt-3 border-t border-neutral-100">
+                <p className="text-[11px] font-medium text-neutral-500 mb-1.5">Related</p>
+                <RelatedBookmarks
+                  bookmarkId={bookmark.id}
+                  domain={bookmark.domain}
+                  category={bookmark.category}
+                />
               </div>
             )}
           </>

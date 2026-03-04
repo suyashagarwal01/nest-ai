@@ -51,3 +51,31 @@ export interface CollectionMember {
 export interface CollectionWithBookmarks extends Collection {
   collection_bookmarks: { bookmark_id: string; added_at: string; bookmarks: Bookmark }[];
 }
+
+export interface ApiKey {
+  id: string;
+  user_id: string;
+  key_prefix: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface RelatedBookmark {
+  id: string;
+  url: string;
+  title: string | null;
+  domain: string | null;
+  favicon_url: string | null;
+  shared_tag_count: number;
+  score: number;
+}
+
+export interface TagVocabulary {
+  [original: string]: string; // e.g. { "ml": "machine-learning" }
+}
+
+export interface InterestVector {
+  [tag: string]: number; // e.g. { "react": 15, "typescript": 12 }
+}

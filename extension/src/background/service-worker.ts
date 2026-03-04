@@ -8,6 +8,19 @@ import {
   recordFeedback,
 } from "../lib/collective-intelligence";
 import {
+  initVocabCache,
+  setupVocabRefresh,
+  applyVocabulary,
+  learnVocabulary,
+  handleVocabAlarm,
+} from "../lib/user-preferences";
+import {
+  initInterestVector,
+  setupInterestRefresh,
+  boostWithInterests,
+  handleInterestAlarm,
+} from "../lib/interest-vector";
+import {
   enqueue,
   dequeue,
   incrementRetry,
@@ -33,6 +46,17 @@ initCollectiveCache().catch((err) =>
   console.warn("Collective intelligence init failed:", err)
 );
 setupCollectiveRefresh();
+
+// Initialize user preferences (vocabulary + interest vector)
+initVocabCache().catch((err) =>
+  console.warn("Vocab cache init failed:", err)
+);
+setupVocabRefresh();
+
+initInterestVector().catch((err) =>
+  console.warn("Interest vector init failed:", err)
+);
+setupInterestRefresh();
 
 // ---------- Screenshot capture ----------
 
@@ -147,9 +171,24 @@ async function saveBookmark(payload: SavePayload): Promise<void> {
   // Generate tags (Tier 1: rule-based), normalize via aliases, filter removed
   const tagResult = generateTags(payload.meta);
   tagResult.topics = tagResult.topics.map(normalizeTag);
+
+  // Apply user's vocabulary overrides (e.g. "ml" → "machine-learning")
+  tagResult.topics = applyVocabulary(tagResult.topics);
+
+  // Apply interest-aware boosting (reorder topics by user's historical interests)
+  tagResult.topics = boostWithInterests(tagResult.topics);
+
   if (payload.removedTopics?.length) {
     const removed = new Set(payload.removedTopics.map(normalizeTag));
     tagResult.topics = tagResult.topics.filter((t) => !removed.has(t));
+  }
+
+  // Learn vocabulary from user edits (detect tag renames)
+  if (payload.removedTopics?.length && payload.userTags.length) {
+    learnVocabulary(
+      payload.removedTopics.map(normalizeTag),
+      payload.userTags.map(normalizeTag)
+    ).catch(() => {}); // fire-and-forget
   }
 
   // Capture screenshot if requested
@@ -413,6 +452,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "offline-queue-retry") {
     processQueue().catch(() => {});
   }
+  // User preferences cache refresh
+  handleVocabAlarm(alarm.name).catch(() => {});
+  handleInterestAlarm(alarm.name).catch(() => {});
 });
 
 // ---------- Keyboard shortcut ----------

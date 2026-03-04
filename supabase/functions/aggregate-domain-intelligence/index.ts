@@ -279,6 +279,23 @@ serve(async (req: Request) => {
       console.error(`Feedback pruning failed: ${pruneError.message}`);
     }
 
+    // 11. Compute and upsert interest vectors for all users
+    let interestVectorsUpdated = 0;
+    const { data: interestRows, error: interestError } = await supabase.rpc(
+      "compute_interest_vectors"
+    );
+    if (interestError) {
+      console.error(`compute_interest_vectors failed: ${interestError.message}`);
+    } else {
+      for (const row of (interestRows as { uid: string; vector: Record<string, number> }[]) ?? []) {
+        const { error: upsertError } = await supabase
+          .from("profiles")
+          .update({ interest_vector: row.vector })
+          .eq("id", row.uid);
+        if (!upsertError) interestVectorsUpdated++;
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -288,6 +305,7 @@ serve(async (req: Request) => {
         consensus_updated: consensusUpdated,
         keywords_updated: keywordsUpdated,
         feedback_adjusted: feedbackAdjusted,
+        interest_vectors_updated: interestVectorsUpdated,
         timestamp: new Date().toISOString(),
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
