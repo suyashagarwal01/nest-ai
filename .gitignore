@@ -9,3 +9,4 @@ dist/
 .next/
 out/
 .vercel/
+.claude/
