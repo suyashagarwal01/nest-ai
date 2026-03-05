@@ -1,11 +1,7 @@
 "use client";
 
 /**
- * Extension UI — all states rendered at 360px for Figma capture.
- * Uses consistent design tokens (CSS variables) so Figma picks up
- * reusable styles. Everything uses flexbox for auto-layout conversion.
- *
- * Updated: Google-only auth, account bar, "Save another" in success.
+ * Extension UI — all states + component interaction states rendered at 360px for Figma capture.
  */
 
 /* ── Inline SVGs ─────────────────────────────────────────── */
@@ -21,632 +17,589 @@ function GoogleIcon() {
   );
 }
 
-function CheckIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
+/* ── Design Tokens ─────────────────────────────────────── */
 
-/* ── Design Tokens (inline styles for clean Figma capture) ── */
-
-const tokens = {
-  // Colors
-  bg: "#FFFFFF",
-  bgSecondary: "#F5F5F5",
-  bgHover: "#E8E8E8",
-  text: "#111111",
-  textSecondary: "#666666",
-  textTertiary: "#999999",
-  textPlaceholder: "#AAAAAA",
-  border: "#E0E0E0",
-  borderFocus: "#111111",
-  accent: "#111111",
-  accentText: "#FFFFFF",
-  success: "#22C55E",
-  successLight: "#F0FDF4",
-  error: "#EF4444",
-  tag: "#F0F0F0",
-  tagText: "#444444",
-  // Typography
-  fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-  // Radii
-  radiusSm: 4,
-  radiusMd: 8,
-  radiusLg: 12,
-  radiusFull: 9999,
-  // Shadows
-  shadowCard: "0 1px 3px rgba(0,0,0,0.08)",
+const t = {
+  bg: "#FFFFFF", bgSec: "#F5F5F5", bgHover: "#E8E8E8",
+  text: "#111111", textSec: "#666666", textTer: "#999999", textPh: "#AAAAAA",
+  border: "#E0E0E0", borderFocus: "#111111",
+  accent: "#111111", accentText: "#FFFFFF",
+  success: "#22C55E", error: "#EF4444",
+  tag: "#F0F0F0", tagText: "#444444",
+  collectiveBg: "#e8f4fd", collectiveBorder: "#90caf9", collectiveText: "#1565c0",
+  font: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  rSm: 4, rMd: 8, rLg: 12, rFull: 9999,
+  shadow: "0 1px 3px rgba(0,0,0,0.08)",
 };
 
 /* ── Shared Components ──────────────────────────────────── */
 
-function ExtensionFrame({ children, label }: { children: React.ReactNode; label: string }) {
+function Frame({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-      <span style={{ fontFamily: tokens.fontFamily, fontSize: 11, color: tokens.textTertiary, fontWeight: 500, letterSpacing: 0.5, textTransform: "uppercase" as const }}>{label}</span>
-      <div style={{
-        width: 360,
-        background: tokens.bg,
-        borderRadius: tokens.radiusLg,
-        border: `1px solid ${tokens.border}`,
-        boxShadow: tokens.shadowCard,
-        overflow: "hidden",
-      }}>
+      <span style={{ fontFamily: t.font, fontSize: 11, color: t.textTer, fontWeight: 500, letterSpacing: 0.5, textTransform: "uppercase" as const }}>{label}</span>
+      <div style={{ width: 360, background: t.bg, borderRadius: t.rLg, border: `1px solid ${t.border}`, boxShadow: t.shadow, overflow: "hidden" }}>
         {children}
       </div>
     </div>
   );
 }
 
-function InputField({ placeholder, value }: { placeholder: string; type?: string; value?: string }) {
+function Input({ placeholder, value, focused }: { placeholder: string; value?: string; focused?: boolean }) {
   return (
     <div style={{
-      width: "100%",
-      padding: "10px 12px",
-      border: `1px solid ${tokens.border}`,
-      borderRadius: tokens.radiusMd,
-      fontSize: 14,
-      fontFamily: tokens.fontFamily,
-      color: value ? tokens.text : tokens.textPlaceholder,
-      background: tokens.bg,
-      boxSizing: "border-box" as const,
+      width: "100%", padding: "10px 12px",
+      border: `1px solid ${focused ? t.borderFocus : t.border}`,
+      borderRadius: t.rMd, fontSize: 14, fontFamily: t.font,
+      color: value ? t.text : t.textPh, background: t.bg, boxSizing: "border-box" as const,
     }}>
       {value || placeholder}
     </div>
   );
 }
 
-function PrimaryButton({ children, fullWidth = true, disabled = false }: { children: React.ReactNode; fullWidth?: boolean; disabled?: boolean }) {
+function Btn({ children, variant = "primary", full = true, disabled, hovered }: { children: React.ReactNode; variant?: "primary" | "secondary" | "google"; full?: boolean; disabled?: boolean; hovered?: boolean }) {
+  const styles: Record<string, React.CSSProperties> = {
+    primary: { background: hovered ? "#333" : t.accent, color: t.accentText },
+    secondary: { background: hovered ? t.bgHover : t.bgSec, color: t.text },
+    google: { background: hovered ? "#f8f9fa" : t.bg, color: t.text, border: `1px solid ${t.border}`, boxShadow: hovered ? t.shadow : "none" },
+  };
   return (
     <div style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "10px 16px",
-      background: tokens.accent,
-      color: tokens.accentText,
-      borderRadius: tokens.radiusMd,
-      fontSize: 14,
-      fontWeight: 600,
-      fontFamily: tokens.fontFamily,
-      width: fullWidth ? "100%" : "auto",
-      boxSizing: "border-box" as const,
-      cursor: "pointer",
-      opacity: disabled ? 0.5 : 1,
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+      padding: "10px 16px", borderRadius: t.rMd, fontSize: 14, fontWeight: variant === "google" ? 500 : 600,
+      fontFamily: t.font, width: full ? "100%" : "auto", boxSizing: "border-box" as const,
+      cursor: "pointer", opacity: disabled ? 0.5 : 1, ...styles[variant],
     }}>
       {children}
     </div>
   );
 }
 
-function SecondaryButton({ children, fullWidth = true }: { children: React.ReactNode; fullWidth?: boolean }) {
-  return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      padding: "10px 16px",
-      background: tokens.bgSecondary,
-      color: tokens.text,
-      borderRadius: tokens.radiusMd,
-      fontSize: 14,
-      fontWeight: 600,
-      fontFamily: tokens.fontFamily,
-      width: fullWidth ? "100%" : "auto",
-      boxSizing: "border-box" as const,
-      cursor: "pointer",
-    }}>
-      {children}
-    </div>
-  );
-}
-
-function GoogleButton() {
-  return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 10,
-      padding: "10px 16px",
-      background: tokens.bg,
-      border: `1px solid ${tokens.border}`,
-      borderRadius: tokens.radiusMd,
-      fontSize: 14,
-      fontWeight: 500,
-      fontFamily: tokens.fontFamily,
-      width: "100%",
-      boxSizing: "border-box" as const,
-      cursor: "pointer",
-    }}>
-      <GoogleIcon />
-      Sign in with Google
-    </div>
-  );
-}
-
-function AccountBar({ name, avatarBg }: { name: string; avatarBg: string }) {
+function AccountBar() {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 4 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-        <div style={{
-          width: 24,
-          height: 24,
-          borderRadius: 12,
-          background: avatarBg,
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 11,
-          fontWeight: 600,
-          color: tokens.accentText,
-          fontFamily: tokens.fontFamily,
-        }}>
-          {name.charAt(0).toUpperCase()}
-        </div>
-        <span style={{
-          fontSize: 13,
-          fontWeight: 500,
-          color: "#333",
-          fontFamily: tokens.fontFamily,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap" as const,
-        }}>
-          {name}
-        </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ width: 24, height: 24, borderRadius: 12, background: "#4285F4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: t.accentText, fontFamily: t.font }}>S</div>
+        <span style={{ fontSize: 13, fontWeight: 500, color: "#333", fontFamily: t.font }}>Suyash Agarwal</span>
       </div>
-      <span style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: tokens.fontFamily, cursor: "pointer" }}>
-        Sign out
-      </span>
+      <span style={{ fontSize: 12, color: t.textSec, fontFamily: t.font, cursor: "pointer" }}>Sign out</span>
     </div>
   );
 }
 
-function TagPill({ label }: { label: string }) {
+function Tag({ label, category, collective, removable }: { label: string; category?: boolean; collective?: boolean; removable?: boolean }) {
+  const bg = category ? t.accent : collective ? t.collectiveBg : t.tag;
+  const color = category ? t.accentText : collective ? t.collectiveText : t.tagText;
+  const border = collective ? `1px dashed ${t.collectiveBorder}` : "none";
   return (
-    <span style={{
-      display: "inline-block",
-      padding: "3px 10px",
-      background: tokens.tag,
-      borderRadius: tokens.radiusFull,
-      fontSize: 12,
-      color: tokens.tagText,
-      fontFamily: tokens.fontFamily,
-    }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", background: bg, border, borderRadius: t.rFull, fontSize: 12, color, fontFamily: t.font, fontWeight: category ? 500 : 400 }}>
       {label}
+      {removable && <span style={{ fontSize: 14, color: collective ? t.collectiveText : t.textTer, marginRight: -4, cursor: "pointer" }}>&times;</span>}
     </span>
   );
 }
 
 function Toggle({ checked }: { checked: boolean }) {
   return (
-    <div style={{
-      width: 36,
-      height: 20,
-      borderRadius: 10,
-      background: checked ? tokens.accent : tokens.border,
-      position: "relative" as const,
-      flexShrink: 0,
-    }}>
-      <div style={{
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        background: tokens.bg,
-        position: "absolute" as const,
-        top: 2,
-        left: checked ? 18 : 2,
-        boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
-      }} />
+    <div style={{ width: 36, height: 20, borderRadius: 10, background: checked ? t.accent : t.border, position: "relative" as const, flexShrink: 0 }}>
+      <div style={{ width: 16, height: 16, borderRadius: 8, background: t.bg, position: "absolute" as const, top: 2, left: checked ? 18 : 2, boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }} />
     </div>
   );
 }
 
-function FooterLink({ label }: { label: string }) {
+function Footer({ label = "View Dashboard" }: { label?: string }) {
+  return <div style={{ textAlign: "center" as const, paddingTop: 4 }}><span style={{ fontSize: 12, color: t.textSec, fontFamily: t.font, cursor: "pointer" }}>{label}</span></div>;
+}
+
+function Screenshot({ domain, color }: { domain: string; color: string }) {
   return (
-    <div style={{ textAlign: "center" as const, paddingTop: 4 }}>
-      <span style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: tokens.fontFamily, cursor: "pointer" }}>
-        {label}
-      </span>
+    <div style={{ width: "100%", height: 140, borderRadius: t.rMd, overflow: "hidden", background: "#1a1a2e", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color, fontSize: 28, fontWeight: 700, fontFamily: "monospace" }}>{domain}</div>
     </div>
   );
 }
 
-/* ── State 1: Auth (Google only) ───────────────────────── */
-
-function AuthState() {
+function UrlRow({ icon, url }: { icon: string; url: string }) {
   return (
-    <ExtensionFrame label="Auth — Sign In">
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
-        <div style={{ fontSize: 24, fontWeight: 700, color: tokens.text, fontFamily: tokens.fontFamily, letterSpacing: -0.5 }}>
-          inSpace
-        </div>
-        <div style={{ fontSize: 13, color: tokens.textSecondary, fontFamily: tokens.fontFamily, marginBottom: 8 }}>
-          Smart bookmarks, everywhere.
-        </div>
-        <GoogleButton />
-      </div>
-    </ExtensionFrame>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0" }}>
+      <div style={{ width: 16, height: 16, borderRadius: 2, background: icon, flexShrink: 0 }} />
+      <span style={{ fontSize: 12, color: t.textSec, fontFamily: t.font, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{url}</span>
+    </div>
   );
 }
 
-/* ── State 1b: Auth Error ──────────────────────────────── */
-
-function AuthErrorState() {
+function TimerBar({ pct }: { pct: number }) {
   return (
-    <ExtensionFrame label="Auth — Error">
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
-        <div style={{ fontSize: 24, fontWeight: 700, color: tokens.text, fontFamily: tokens.fontFamily, letterSpacing: -0.5 }}>
-          inSpace
-        </div>
-        <div style={{ fontSize: 13, color: tokens.textSecondary, fontFamily: tokens.fontFamily, marginBottom: 8 }}>
-          Smart bookmarks, everywhere.
-        </div>
-        <GoogleButton />
-        <div style={{ fontSize: 12, color: tokens.error, fontFamily: tokens.fontFamily, textAlign: "center" as const }}>
-          Sign-in was cancelled.
-        </div>
-      </div>
-    </ExtensionFrame>
+    <div style={{ width: "100%", height: 3, background: t.border, borderRadius: 2, overflow: "hidden" }}>
+      <div style={{ height: "100%", width: `${pct}%`, background: t.accent, borderRadius: 2 }} />
+    </div>
   );
 }
 
-/* ── State 2: Save (with screenshot + account bar) ──────── */
+function Spinner() {
+  return <div style={{ width: 24, height: 24, borderRadius: 12, border: `2.5px solid ${t.border}`, borderTopColor: t.accent }} />;
+}
 
-function SaveState() {
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 style={{ fontSize: 16, fontWeight: 700, color: t.text, fontFamily: t.font, marginBottom: 8, marginTop: 48 }}>{children}</h2>;
+}
+
+function SectionSub({ children }: { children: React.ReactNode }) {
+  return <p style={{ fontSize: 12, color: t.textTer, fontFamily: t.font, marginBottom: 24 }}>{children}</p>;
+}
+
+/* ── STATE 1: Auth ────────────────────────────────────────── */
+
+function AuthDefault() {
   return (
-    <ExtensionFrame label="Save — With Screenshot">
+    <Frame label="Auth — Default">
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
+        <div style={{ fontSize: 24, fontWeight: 700, color: t.text, fontFamily: t.font, letterSpacing: -0.5 }}>inSpace</div>
+        <div style={{ fontSize: 13, color: t.textSec, fontFamily: t.font, marginBottom: 8 }}>Smart bookmarks, everywhere.</div>
+        <Btn variant="google"><GoogleIcon />Sign in with Google</Btn>
+      </div>
+    </Frame>
+  );
+}
+
+function AuthHover() {
+  return (
+    <Frame label="Auth — Button Hover">
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
+        <div style={{ fontSize: 24, fontWeight: 700, color: t.text, fontFamily: t.font, letterSpacing: -0.5 }}>inSpace</div>
+        <div style={{ fontSize: 13, color: t.textSec, fontFamily: t.font, marginBottom: 8 }}>Smart bookmarks, everywhere.</div>
+        <Btn variant="google" hovered><GoogleIcon />Sign in with Google</Btn>
+      </div>
+    </Frame>
+  );
+}
+
+function AuthLoading() {
+  return (
+    <Frame label="Auth — Loading">
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
+        <div style={{ fontSize: 24, fontWeight: 700, color: t.text, fontFamily: t.font, letterSpacing: -0.5 }}>inSpace</div>
+        <div style={{ fontSize: 13, color: t.textSec, fontFamily: t.font, marginBottom: 8 }}>Smart bookmarks, everywhere.</div>
+        <Btn variant="google" disabled><GoogleIcon />Signing in...</Btn>
+      </div>
+    </Frame>
+  );
+}
+
+function AuthError() {
+  return (
+    <Frame label="Auth — Error">
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
+        <div style={{ fontSize: 24, fontWeight: 700, color: t.text, fontFamily: t.font, letterSpacing: -0.5 }}>inSpace</div>
+        <div style={{ fontSize: 13, color: t.textSec, fontFamily: t.font, marginBottom: 8 }}>Smart bookmarks, everywhere.</div>
+        <Btn variant="google"><GoogleIcon />Sign in with Google</Btn>
+        <div style={{ fontSize: 12, color: t.error, fontFamily: t.font, textAlign: "center" as const }}>Sign-in was cancelled.</div>
+      </div>
+    </Frame>
+  );
+}
+
+/* ── STATE 2: Save Form ───────────────────────────────────── */
+
+function SaveDefault() {
+  return (
+    <Frame label="Save — Default">
       <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
-        <AccountBar name="Suyash Agarwal" avatarBg="#4285F4" />
-
-        {/* Screenshot preview */}
-        <div style={{
-          width: "100%",
-          height: 140,
-          borderRadius: tokens.radiusMd,
-          overflow: "hidden",
-          background: "#1a1a2e",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}>
-          <div style={{ color: "#6366f1", fontSize: 32, fontWeight: 700, fontFamily: "monospace" }}>
-            github.com
-          </div>
-        </div>
-
-        <InputField placeholder="Page title" value="vercel/next.js: The React Framework" />
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0" }}>
-          <div style={{ width: 16, height: 16, borderRadius: 2, background: "#24292e", flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: tokens.fontFamily, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
-            github.com/vercel/next.js
-          </span>
-        </div>
-
+        <AccountBar />
+        <Screenshot domain="github.com" color="#6366f1" />
+        <Input placeholder="Page title" value="vercel/next.js: The React Framework" />
+        <UrlRow icon="#24292e" url="github.com/vercel/next.js" />
         <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
-          <TagPill label="development" />
-          <TagPill label="react" />
-          <TagPill label="framework" />
-          <TagPill label="vercel" />
+          <Tag label="Development" category />
+          <Tag label="GitHub repository" />
+          <Tag label="react" removable />
+          <Tag label="framework" removable />
+          <Tag label="open-source" removable />
         </div>
-
-        <InputField placeholder="Add a note (optional)" />
-
+        <Input placeholder="Add tag(s), separated by commas" />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
-          <span style={{ fontSize: 13, color: tokens.tagText, fontFamily: tokens.fontFamily }}>Capture screenshot</span>
+          <span style={{ fontSize: 13, color: t.tagText, fontFamily: t.font }}>Capture screenshot</span>
           <Toggle checked={true} />
         </div>
-
-        <PrimaryButton>Save</PrimaryButton>
-        <FooterLink label="View Dashboard" />
+        <Btn>Save</Btn>
+        <Footer />
       </div>
-    </ExtensionFrame>
+    </Frame>
   );
 }
 
-/* ── State 2b: Save (without screenshot) ─────────────────── */
-
-function SaveNoScreenshotState() {
+function SaveHoverBtn() {
   return (
-    <ExtensionFrame label="Save — No Screenshot">
+    <Frame label="Save — Button Hover">
       <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
-        <AccountBar name="Suyash Agarwal" avatarBg="#4285F4" />
-
-        <InputField placeholder="Page title" value="Attention Is All You Need — arXiv" />
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0" }}>
-          <div style={{ width: 16, height: 16, borderRadius: 2, background: "#b31b1b", flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: tokens.fontFamily, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
-            arxiv.org/abs/1706.03762
-          </span>
-        </div>
-
+        <AccountBar />
+        <Screenshot domain="github.com" color="#6366f1" />
+        <Input placeholder="Page title" value="vercel/next.js: The React Framework" />
+        <UrlRow icon="#24292e" url="github.com/vercel/next.js" />
         <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
-          <TagPill label="research" />
-          <TagPill label="ai" />
-          <TagPill label="machine-learning" />
+          <Tag label="Development" category />
+          <Tag label="react" removable />
+          <Tag label="framework" removable />
         </div>
-
-        <InputField placeholder="Add a note (optional)" value="Foundational transformer paper" />
-
+        <Input placeholder="Add tag(s), separated by commas" />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
-          <span style={{ fontSize: 13, color: tokens.tagText, fontFamily: tokens.fontFamily }}>Capture screenshot</span>
+          <span style={{ fontSize: 13, color: t.tagText, fontFamily: t.font }}>Capture screenshot</span>
+          <Toggle checked={true} />
+        </div>
+        <Btn hovered>Save</Btn>
+        <Footer />
+      </div>
+    </Frame>
+  );
+}
+
+function SaveInputFocused() {
+  return (
+    <Frame label="Save — Input Focused">
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
+        <AccountBar />
+        <Input placeholder="Page title" value="Attention Is All You Need" focused />
+        <UrlRow icon="#b31b1b" url="arxiv.org/abs/1706.03762" />
+        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
+          <Tag label="Research" category />
+          <Tag label="arXiv paper" />
+          <Tag label="ai" removable />
+          <Tag label="machine-learning" removable />
+        </div>
+        <Input placeholder="Add tag(s), separated by commas" value="transformers, nlp" focused />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
+          <span style={{ fontSize: 13, color: t.tagText, fontFamily: t.font }}>Capture screenshot</span>
           <Toggle checked={false} />
         </div>
-
-        <PrimaryButton>Save</PrimaryButton>
-        <FooterLink label="View Dashboard" />
+        <Btn>Save</Btn>
+        <Footer />
       </div>
-    </ExtensionFrame>
+    </Frame>
   );
 }
 
-/* ── State 2c: Saving (loading) ──────────────────────────── */
-
-function SavingState() {
+function SaveWithCollective() {
   return (
-    <ExtensionFrame label="Save — Loading">
+    <Frame label="Save — Collective Tags">
       <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
-        <AccountBar name="Suyash Agarwal" avatarBg="#4285F4" />
+        <AccountBar />
+        <Screenshot domain="react.dev" color="#61dafb" />
+        <Input placeholder="Page title" value="React — The library for web and native UIs" />
+        <UrlRow icon="#61dafb" url="react.dev" />
+        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
+          <Tag label="Documentation" category />
+          <Tag label="React docs" />
+          <Tag label="react" removable />
+          <Tag label="hooks" removable />
+          <span style={{ color: t.textTer, fontSize: 12, display: "flex", alignItems: "center", padding: "0 2px" }}>&middot;</span>
+          <Tag label="frontend" collective removable />
+          <Tag label="ui-library" collective removable />
+        </div>
+        <Input placeholder="Add tag(s), separated by commas" />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
+          <span style={{ fontSize: 13, color: t.tagText, fontFamily: t.font }}>Capture screenshot</span>
+          <Toggle checked={true} />
+        </div>
+        <Btn>Save</Btn>
+        <Footer />
+      </div>
+    </Frame>
+  );
+}
 
-        <div style={{
-          width: "100%",
-          height: 140,
-          borderRadius: tokens.radiusMd,
-          overflow: "hidden",
-          background: "#1a1a2e",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}>
-          <div style={{ color: "#6366f1", fontSize: 32, fontWeight: 700, fontFamily: "monospace" }}>
-            github.com
+function SaveDuplicate() {
+  return (
+    <Frame label="Save — Duplicate Detected">
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
+        <AccountBar />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: t.rMd, fontSize: 12, fontWeight: 500, color: "#92400E", fontFamily: t.font }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+          Already saved on 2/28/2026 — update?
+        </div>
+        <Input placeholder="Page title" value="vercel/next.js: The React Framework" />
+        <UrlRow icon="#24292e" url="github.com/vercel/next.js" />
+        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
+          <Tag label="Development" category />
+          <Tag label="react" removable />
+          <Tag label="framework" removable />
+        </div>
+        <Input placeholder="Add a note" value="Check the App Router docs" />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
+          <span style={{ fontSize: 13, color: t.tagText, fontFamily: t.font }}>Capture screenshot</span>
+          <Toggle checked={true} />
+        </div>
+        <Btn>Update</Btn>
+        <Footer />
+      </div>
+    </Frame>
+  );
+}
+
+function SaveError() {
+  return (
+    <Frame label="Save — Error">
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
+        <AccountBar />
+        <Input placeholder="Page title" value="Some Page Title" />
+        <UrlRow icon="#999" url="example.com/some-page" />
+        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
+          <Tag label="Other" category />
+        </div>
+        <Input placeholder="Add tag(s), separated by commas" />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
+          <span style={{ fontSize: 13, color: t.tagText, fontFamily: t.font }}>Capture screenshot</span>
+          <Toggle checked={true} />
+        </div>
+        <Btn>Save</Btn>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, fontWeight: 500, color: t.error, fontFamily: t.font }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+          Not authenticated. Please sign in first.
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+function SaveOffline() {
+  return (
+    <Frame label="Save — Offline Queued">
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
+        <AccountBar />
+        <Input placeholder="Page title" value="Some Offline Page" />
+        <UrlRow icon="#999" url="example.com/offline" />
+        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
+          <Tag label="Other" category />
+        </div>
+        <Input placeholder="Add tag(s), separated by commas" />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
+          <span style={{ fontSize: 13, color: t.tagText, fontFamily: t.font }}>Capture screenshot</span>
+          <Toggle checked={false} />
+        </div>
+        <Btn>Save</Btn>
+        <div style={{ fontSize: 12, fontWeight: 500, color: "#B45309", fontFamily: t.font, textAlign: "center" as const }}>
+          Saved offline — will sync when online (2 pending)
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/* ── STATE 3: Saving (transition) ─────────────────────────── */
+
+function SavingSpinner() {
+  return (
+    <Frame label="Saving — Spinner">
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
+        <TimerBar pct={0} />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: "32px 0" }}>
+          <Spinner />
+          <span style={{ fontSize: 13, fontWeight: 500, color: t.textSec, fontFamily: t.font }}>Saving...</span>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/* ── STATE 4: Success ─────────────────────────────────────── */
+
+function SuccessPreview({ pct, label }: { pct: number; label: string }) {
+  return (
+    <Frame label={label}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
+        <TimerBar pct={pct} />
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+          {/* Screenshot thumb */}
+          <div style={{ width: 100, height: 68, borderRadius: t.rMd, overflow: "hidden", background: "#1a1a2e", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ color: "#6366f1", fontSize: 14, fontWeight: 700, fontFamily: "monospace" }}>github.com</div>
+          </div>
+          {/* Meta */}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 18, height: 18, borderRadius: 9, background: t.success, color: t.accentText, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>✓</div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: t.success, fontFamily: t.font }}>Saved</span>
+            </div>
+            <p style={{ fontSize: 14, fontWeight: 500, color: t.text, fontFamily: t.font, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, margin: 0 }}>
+              vercel/next.js: The React Framework
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 14, height: 14, borderRadius: 2, background: "#24292e" }} />
+              <span style={{ fontSize: 12, color: t.textSec, fontFamily: t.font }}>github.com</span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 4, marginTop: 2 }}>
+              <span style={{ padding: "2px 8px", background: t.accent, color: t.accentText, borderRadius: t.rFull, fontSize: 11, fontFamily: t.font, fontWeight: 500 }}>Development</span>
+              <span style={{ padding: "2px 8px", background: t.tag, color: t.tagText, borderRadius: t.rFull, fontSize: 11, fontFamily: t.font }}>react</span>
+              <span style={{ padding: "2px 8px", background: t.tag, color: t.tagText, borderRadius: t.rFull, fontSize: 11, fontFamily: t.font }}>framework</span>
+            </div>
+          </div>
+        </div>
+        <Footer label="View in Dashboard" />
+      </div>
+    </Frame>
+  );
+}
+
+function SuccessNoScreenshot() {
+  return (
+    <Frame label="Success — No Screenshot">
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
+        <TimerBar pct={50} />
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+          {/* Meta only, no thumbnail */}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 18, height: 18, borderRadius: 9, background: t.success, color: t.accentText, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>✓</div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: t.success, fontFamily: t.font }}>Saved</span>
+            </div>
+            <p style={{ fontSize: 14, fontWeight: 500, color: t.text, fontFamily: t.font, margin: 0 }}>
+              Attention Is All You Need
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 14, height: 14, borderRadius: 2, background: "#b31b1b" }} />
+              <span style={{ fontSize: 12, color: t.textSec, fontFamily: t.font }}>arxiv.org</span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 4, marginTop: 2 }}>
+              <span style={{ padding: "2px 8px", background: t.accent, color: t.accentText, borderRadius: t.rFull, fontSize: 11, fontFamily: t.font, fontWeight: 500 }}>Research</span>
+              <span style={{ padding: "2px 8px", background: t.tag, color: t.tagText, borderRadius: t.rFull, fontSize: 11, fontFamily: t.font }}>ai</span>
+              <span style={{ padding: "2px 8px", background: t.tag, color: t.tagText, borderRadius: t.rFull, fontSize: 11, fontFamily: t.font }}>machine-learning</span>
+            </div>
+          </div>
+        </div>
+        <Footer label="View in Dashboard" />
+      </div>
+    </Frame>
+  );
+}
+
+/* ── COMPONENT STATES ─────────────────────────────────────── */
+
+function ComponentStates() {
+  return (
+    <>
+      <SectionTitle>Component Interaction States</SectionTitle>
+      <SectionSub>Button, input, toggle, and tag states at the component level</SectionSub>
+
+      <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 32, marginBottom: 48 }}>
+        {/* Buttons */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, width: 200 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: t.textTer, fontFamily: t.font, textTransform: "uppercase" as const, letterSpacing: 0.5 }}>Primary Button</span>
+          <Btn full={false}>Default</Btn>
+          <Btn full={false} hovered>Hovered</Btn>
+          <Btn full={false} disabled>Disabled</Btn>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, width: 200 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: t.textTer, fontFamily: t.font, textTransform: "uppercase" as const, letterSpacing: 0.5 }}>Secondary Button</span>
+          <Btn variant="secondary" full={false}>Default</Btn>
+          <Btn variant="secondary" full={false} hovered>Hovered</Btn>
+          <Btn variant="secondary" full={false} disabled>Disabled</Btn>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, width: 240 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: t.textTer, fontFamily: t.font, textTransform: "uppercase" as const, letterSpacing: 0.5 }}>Google Button</span>
+          <Btn variant="google" full={false}><GoogleIcon />Default</Btn>
+          <Btn variant="google" full={false} hovered><GoogleIcon />Hovered</Btn>
+          <Btn variant="google" full={false} disabled><GoogleIcon />Disabled</Btn>
+        </div>
+
+        {/* Inputs */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, width: 280 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: t.textTer, fontFamily: t.font, textTransform: "uppercase" as const, letterSpacing: 0.5 }}>Input Field</span>
+          <Input placeholder="Placeholder text" />
+          <Input placeholder="With value" value="Some text entered" />
+          <Input placeholder="Focused state" value="Editing..." focused />
+        </div>
+
+        {/* Toggles */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: t.textTer, fontFamily: t.font, textTransform: "uppercase" as const, letterSpacing: 0.5 }}>Toggle</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Toggle checked={false} />
+            <span style={{ fontSize: 12, color: t.textSec, fontFamily: t.font }}>Off</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Toggle checked={true} />
+            <span style={{ fontSize: 12, color: t.textSec, fontFamily: t.font }}>On</span>
           </div>
         </div>
 
-        <InputField placeholder="Page title" value="vercel/next.js: The React Framework" />
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0" }}>
-          <div style={{ width: 16, height: 16, borderRadius: 2, background: "#24292e", flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: tokens.fontFamily }}>
-            github.com/vercel/next.js
-          </span>
+        {/* Tags */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: t.textTer, fontFamily: t.font, textTransform: "uppercase" as const, letterSpacing: 0.5 }}>Tags</span>
+          <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
+            <Tag label="Category" category />
+            <Tag label="Domain context" />
+            <Tag label="topic" removable />
+            <Tag label="community-tag" collective removable />
+          </div>
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
-          <TagPill label="development" />
-          <TagPill label="react" />
-          <TagPill label="framework" />
-        </div>
-
-        <InputField placeholder="Add a note (optional)" />
-
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
-          <span style={{ fontSize: 13, color: tokens.tagText, fontFamily: tokens.fontFamily }}>Capture screenshot</span>
-          <Toggle checked={true} />
-        </div>
-
-        <PrimaryButton disabled>Save</PrimaryButton>
-
-        <div style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: tokens.fontFamily, textAlign: "center" as const }}>
-          Saving...
+        {/* Timer Bar */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, width: 200 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: t.textTer, fontFamily: t.font, textTransform: "uppercase" as const, letterSpacing: 0.5 }}>Timer Bar</span>
+          <TimerBar pct={100} />
+          <TimerBar pct={66} />
+          <TimerBar pct={33} />
+          <TimerBar pct={0} />
         </div>
       </div>
-    </ExtensionFrame>
+    </>
   );
 }
 
-/* ── State 3: Success ────────────────────────────────────── */
-
-function SuccessState() {
-  return (
-    <ExtensionFrame label="Success">
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "32px 16px 16px" }}>
-        <div style={{
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          background: tokens.success,
-          color: tokens.accentText,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 24,
-          fontWeight: 700,
-        }}>
-          <CheckIcon size={24} />
-        </div>
-        <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text, fontFamily: tokens.fontFamily, marginBottom: 4 }}>
-          Saved to inSpace
-        </div>
-        <PrimaryButton>View Dashboard</PrimaryButton>
-        <SecondaryButton>Save another</SecondaryButton>
-      </div>
-    </ExtensionFrame>
-  );
-}
-
-/* ── State 3b: Duplicate ──────────────────────────────────── */
-
-function DuplicateState() {
-  return (
-    <ExtensionFrame label="Duplicate Detected">
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16 }}>
-        <AccountBar name="Suyash Agarwal" avatarBg="#4285F4" />
-
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "10px 12px",
-          background: "#FFF7ED",
-          border: "1px solid #FED7AA",
-          borderRadius: tokens.radiusMd,
-          fontSize: 13,
-          color: "#9A3412",
-          fontFamily: tokens.fontFamily,
-        }}>
-          Already saved — update?
-        </div>
-
-        <InputField placeholder="Page title" value="vercel/next.js: The React Framework" />
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0" }}>
-          <div style={{ width: 16, height: 16, borderRadius: 2, background: "#24292e", flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: tokens.textSecondary, fontFamily: tokens.fontFamily }}>
-            github.com/vercel/next.js
-          </span>
-        </div>
-
-        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
-          <TagPill label="development" />
-          <TagPill label="react" />
-          <TagPill label="framework" />
-        </div>
-
-        <InputField placeholder="Add a note (optional)" value="Check the App Router docs" />
-
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
-          <span style={{ fontSize: 13, color: tokens.tagText, fontFamily: tokens.fontFamily }}>Capture screenshot</span>
-          <Toggle checked={true} />
-        </div>
-
-        <PrimaryButton>Update</PrimaryButton>
-        <FooterLink label="View Dashboard" />
-      </div>
-    </ExtensionFrame>
-  );
-}
-
-/* ── Page Layout ─────────────────────────────────────────── */
+/* ── PAGE ──────────────────────────────────────────────────── */
 
 export default function ExtensionDesignsPage() {
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#F8F8F8",
-      padding: 48,
-      fontFamily: tokens.fontFamily,
-    }}>
-      {/* Title */}
-      <div style={{ marginBottom: 40, textAlign: "center" as const }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: tokens.text, marginBottom: 4 }}>
-          inSpace — Extension UI States
-        </h1>
-        <p style={{ fontSize: 13, color: tokens.textTertiary }}>
-          360px popup · Google-only auth · Account bar · All states
-        </p>
-      </div>
-
-      {/* States grid */}
-      <div style={{
-        display: "flex",
-        flexWrap: "wrap" as const,
-        gap: 40,
-        justifyContent: "center",
-        marginBottom: 64,
-      }}>
-        <AuthState />
-        <AuthErrorState />
-        <SaveState />
-        <SaveNoScreenshotState />
-        <SavingState />
-        <SuccessState />
-        <DuplicateState />
-      </div>
-
-      {/* Design Tokens Reference */}
-      <div style={{
-        maxWidth: 800,
-        margin: "0 auto",
-        background: tokens.bg,
-        borderRadius: tokens.radiusLg,
-        border: `1px solid ${tokens.border}`,
-        padding: 24,
-      }}>
-        <h2 style={{ fontSize: 14, fontWeight: 700, color: tokens.text, marginBottom: 16 }}>
-          Design Tokens
-        </h2>
-
-        {/* Colors */}
-        <div style={{ marginBottom: 20 }}>
-          <h3 style={{ fontSize: 11, fontWeight: 600, color: tokens.textTertiary, textTransform: "uppercase" as const, letterSpacing: 0.5, marginBottom: 8 }}>Colors</h3>
-          <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 8 }}>
-            {[
-              { name: "bg", value: "#FFFFFF" },
-              { name: "bg-secondary", value: "#F5F5F5" },
-              { name: "text", value: "#111111" },
-              { name: "text-secondary", value: "#666666" },
-              { name: "text-tertiary", value: "#999999" },
-              { name: "border", value: "#E0E0E0" },
-              { name: "accent", value: "#111111" },
-              { name: "success", value: "#22C55E" },
-              { name: "error", value: "#EF4444" },
-              { name: "tag-bg", value: "#F0F0F0" },
-              { name: "tag-text", value: "#444444" },
-              { name: "warning-bg", value: "#FFF7ED" },
-              { name: "warning-border", value: "#FED7AA" },
-              { name: "warning-text", value: "#9A3412" },
-            ].map((c) => (
-              <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", background: tokens.bgSecondary, borderRadius: 6, fontSize: 11, fontFamily: "monospace" }}>
-                <div style={{ width: 14, height: 14, borderRadius: 3, background: c.value, border: "1px solid #ddd", flexShrink: 0 }} />
-                <span style={{ color: tokens.textSecondary }}>{c.name}</span>
-                <span style={{ color: tokens.textTertiary }}>{c.value}</span>
-              </div>
-            ))}
-          </div>
+    <div style={{ minHeight: "100vh", background: "#F8F8F8", padding: 48, fontFamily: t.font }}>
+      <div style={{ maxWidth: 1600, margin: "0 auto" }}>
+        <div style={{ marginBottom: 40, textAlign: "center" as const }}>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: t.text, marginBottom: 4 }}>inSpace — Extension UI States</h1>
+          <p style={{ fontSize: 13, color: t.textTer }}>360px popup &middot; All screens &middot; All interaction states</p>
         </div>
 
-        {/* Typography */}
-        <div style={{ marginBottom: 20 }}>
-          <h3 style={{ fontSize: 11, fontWeight: 600, color: tokens.textTertiary, textTransform: "uppercase" as const, letterSpacing: 0.5, marginBottom: 8 }}>Typography</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {[
-              { name: "Logo", size: "24px", weight: "700", tracking: "-0.5px" },
-              { name: "Account", size: "13px", weight: "500", tracking: "0" },
-              { name: "Title", size: "16px", weight: "600", tracking: "0" },
-              { name: "Body", size: "14px", weight: "400", tracking: "0" },
-              { name: "Button", size: "14px", weight: "600", tracking: "0" },
-              { name: "Label", size: "13px", weight: "400", tracking: "0" },
-              { name: "Caption", size: "12px", weight: "400", tracking: "0" },
-              { name: "Tag", size: "12px", weight: "400", tracking: "0" },
-              { name: "Overline", size: "11px", weight: "500", tracking: "0.5px" },
-            ].map((t) => (
-              <div key={t.name} style={{ display: "flex", alignItems: "baseline", gap: 12, fontSize: 11, fontFamily: "monospace" }}>
-                <span style={{ width: 80, color: tokens.textSecondary, flexShrink: 0 }}>{t.name}</span>
-                <span style={{ color: tokens.textTertiary }}>{t.size} / {t.weight} / {t.tracking}</span>
-              </div>
-            ))}
-          </div>
+        {/* Auth states */}
+        <SectionTitle>1. Authentication</SectionTitle>
+        <SectionSub>Google sign-in flow with all states</SectionSub>
+        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 32, marginBottom: 48 }}>
+          <AuthDefault />
+          <AuthHover />
+          <AuthLoading />
+          <AuthError />
         </div>
 
-        {/* Spacing & Radii */}
-        <div>
-          <h3 style={{ fontSize: 11, fontWeight: 600, color: tokens.textTertiary, textTransform: "uppercase" as const, letterSpacing: 0.5, marginBottom: 8 }}>Radii & Spacing</h3>
-          <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 8, fontSize: 11, fontFamily: "monospace" }}>
-            {[
-              { name: "radius-sm", value: "4px" },
-              { name: "radius-md", value: "8px" },
-              { name: "radius-lg", value: "12px" },
-              { name: "radius-full", value: "9999px" },
-              { name: "space-popup", value: "16px" },
-              { name: "space-gap", value: "12px" },
-              { name: "space-tag-gap", value: "6px" },
-              { name: "shadow-card", value: "0 1px 3px rgba(0,0,0,0.08)" },
-            ].map((s) => (
-              <div key={s.name} style={{ padding: "4px 8px", background: tokens.bgSecondary, borderRadius: 6 }}>
-                <span style={{ color: tokens.textSecondary }}>{s.name}: </span>
-                <span style={{ color: tokens.textTertiary }}>{s.value}</span>
-              </div>
-            ))}
-          </div>
+        {/* Save form states */}
+        <SectionTitle>2. Save Form</SectionTitle>
+        <SectionSub>Bookmark saving with screenshot, tags, duplicate detection, errors</SectionSub>
+        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 32, marginBottom: 48 }}>
+          <SaveDefault />
+          <SaveHoverBtn />
+          <SaveInputFocused />
+          <SaveWithCollective />
+          <SaveDuplicate />
+          <SaveError />
+          <SaveOffline />
         </div>
+
+        {/* Saving transition */}
+        <SectionTitle>3. Saving Transition</SectionTitle>
+        <SectionSub>Immediate transition to spinner while bookmark saves</SectionSub>
+        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 32, marginBottom: 48 }}>
+          <SavingSpinner />
+        </div>
+
+        {/* Success states */}
+        <SectionTitle>4. Success &amp; Auto-Dismiss</SectionTitle>
+        <SectionSub>Saved preview with countdown timer bar (2s, pauses on hover)</SectionSub>
+        <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 32, marginBottom: 48 }}>
+          <SuccessPreview pct={100} label="Success — Timer Start" />
+          <SuccessPreview pct={50} label="Success — Timer 50%" />
+          <SuccessPreview pct={10} label="Success — Timer End" />
+          <SuccessNoScreenshot />
+        </div>
+
+        {/* Component states */}
+        <ComponentStates />
       </div>
     </div>
   );

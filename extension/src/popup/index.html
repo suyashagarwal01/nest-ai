@@ -85,16 +85,37 @@
 
     <!-- Success screen -->
     <div id="success-view" class="view" style="display: none">
-      <div class="success-container">
-        <div class="success-icon">✓</div>
-        <p class="success-text">Saved to inSpace</p>
-        <div class="success-actions">
-          <button id="btn-open-dashboard" class="btn btn-primary btn-full">
-            View Dashboard
-          </button>
-          <button id="btn-save-another" class="btn btn-secondary btn-full">
-            Save another
-          </button>
+      <div class="success-timer-bar">
+        <div id="timer-progress" class="success-timer-progress"></div>
+      </div>
+
+      <!-- Loading state (shown while saving) -->
+      <div id="success-loading" class="success-loading">
+        <div class="success-spinner"></div>
+        <span class="success-loading-text">Saving...</span>
+      </div>
+
+      <!-- Saved state (shown after save completes) -->
+      <div id="success-saved" class="success-saved" style="display: none">
+        <div class="success-preview">
+          <div id="success-screenshot" class="success-screenshot">
+            <img id="success-screenshot-img" src="" alt="" />
+          </div>
+          <div class="success-meta">
+            <div class="success-header">
+              <div class="success-check">✓</div>
+              <span class="success-label">Saved</span>
+            </div>
+            <p id="success-title" class="success-title"></p>
+            <div class="success-url-row">
+              <img id="success-favicon" class="favicon" src="" alt="" />
+              <span id="success-domain" class="url-text"></span>
+            </div>
+            <div id="success-tags" class="success-tags"></div>
+          </div>
+        </div>
+        <div class="footer">
+          <button id="btn-open-dashboard" class="btn-link">View in Dashboard</button>
         </div>
       </div>
     </div>

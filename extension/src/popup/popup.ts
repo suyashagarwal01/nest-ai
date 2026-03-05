@@ -37,8 +37,16 @@ const saveStatus = document.getElementById("save-status") as HTMLDivElement;
 const btnDashboardFooter = document.getElementById("btn-dashboard-footer") as HTMLButtonElement;
 
 // Success
+const successLoading = document.getElementById("success-loading") as HTMLDivElement;
+const successSaved = document.getElementById("success-saved") as HTMLDivElement;
 const btnOpenDashboard = document.getElementById("btn-open-dashboard") as HTMLButtonElement;
-const btnSaveAnother = document.getElementById("btn-save-another") as HTMLButtonElement;
+const timerProgress = document.getElementById("timer-progress") as HTMLDivElement;
+const successScreenshot = document.getElementById("success-screenshot") as HTMLDivElement;
+const successScreenshotImg = document.getElementById("success-screenshot-img") as HTMLImageElement;
+const successTitle = document.getElementById("success-title") as HTMLParagraphElement;
+const successFavicon = document.getElementById("success-favicon") as HTMLImageElement;
+const successDomain = document.getElementById("success-domain") as HTMLSpanElement;
+const successTags = document.getElementById("success-tags") as HTMLDivElement;
 
 // ─── State ───────────────────────────────────────────────────
 
@@ -435,8 +443,9 @@ btnSave.addEventListener("click", async () => {
   if (!currentMeta) return;
 
   btnSave.disabled = true;
-  saveStatus.innerHTML = "";
-  saveStatus.textContent = "Saving...";
+
+  // Immediately switch to success view with loading spinner
+  showSavingState();
 
   try {
     // Send save to background service worker
@@ -467,19 +476,22 @@ btnSave.addEventListener("click", async () => {
     } as ExtensionMessage);
 
     if (response?.success) {
-      showView("success");
+      showSuccessWithPreview();
     } else if (response?.error === "__OFFLINE__") {
-      // Get updated queue count from background
+      // Go back to save view for offline state
+      showView("save");
       const queueResp = await chrome.runtime.sendMessage({
         type: "GET_QUEUE_STATUS",
       } as ExtensionMessage);
       showSaveQueued(queueResp?.count ?? 1);
       btnSave.disabled = false;
     } else {
+      showView("save");
       showSaveError(response?.error ?? "Failed to save.");
       btnSave.disabled = false;
     }
   } catch (err) {
+    showView("save");
     showSaveError(err instanceof Error ? err.message : "Failed to save.");
     btnSave.disabled = false;
   }
@@ -496,10 +508,118 @@ function openDashboard() {
 btnOpenDashboard.addEventListener("click", openDashboard);
 btnDashboardFooter.addEventListener("click", openDashboard);
 
-// ─── Save Another ────────────────────────────────────────────
+// ─── Success with Preview + Auto-Dismiss ─────────────────────
 
-btnSaveAnother.addEventListener("click", async () => {
-  await initSaveView();
+const AUTO_DISMISS_MS = 2000;
+let dismissTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showSavingState() {
+  // Show success view with loading spinner, hide saved content
+  successLoading.style.display = "flex";
+  successSaved.style.display = "none";
+  timerProgress.style.transition = "none";
+  timerProgress.style.width = "0%";
+  showView("success");
+}
+
+function showSuccessWithPreview() {
+  // Switch from loading to saved content
+  successLoading.style.display = "none";
+  successSaved.style.display = "flex";
+
+  // Populate preview from current save data
+  successTitle.textContent = inputTitle.value || currentMeta?.url || "";
+
+  // Domain
+  try {
+    const hostname = new URL(currentMeta?.url ?? "").hostname;
+    successDomain.textContent = hostname;
+  } catch {
+    successDomain.textContent = "";
+  }
+
+  // Favicon
+  if (currentMeta?.favicon) {
+    successFavicon.src = currentMeta.favicon;
+    successFavicon.style.display = "block";
+    successFavicon.onerror = () => { successFavicon.style.display = "none"; };
+  } else {
+    successFavicon.style.display = "none";
+  }
+
+  // Screenshot
+  if (currentScreenshotUrl && toggleScreenshot.checked) {
+    successScreenshotImg.src = currentScreenshotUrl;
+    successScreenshot.classList.remove("hidden");
+  } else {
+    successScreenshot.classList.add("hidden");
+  }
+
+  // Tags
+  let tagsHtml = "";
+  if (currentTagResult) {
+    if (currentTagResult.category && currentTagResult.category !== "Other") {
+      tagsHtml += `<span class="tag tag-category">${currentTagResult.category}</span>`;
+    }
+    const topics = currentTagResult.topics.filter((t) => !removedTopics.has(t));
+    for (const t of topics.slice(0, 3)) {
+      tagsHtml += `<span class="tag tag-topic">${t}</span>`;
+    }
+  }
+  successTags.innerHTML = tagsHtml;
+
+  // Show view
+  showView("success");
+
+  // Start timer bar animation: reset to full, then animate to 0
+  timerProgress.style.transition = "none";
+  timerProgress.style.width = "100%";
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      timerProgress.style.transition = `width ${AUTO_DISMISS_MS}ms linear`;
+      timerProgress.style.width = "0%";
+    });
+  });
+
+  // Auto-close popup when timer finishes
+  if (dismissTimer) clearTimeout(dismissTimer);
+  dismissTimer = setTimeout(() => {
+    window.close();
+  }, AUTO_DISMISS_MS);
+}
+
+// Pause timer on hover (user is reading/clicking)
+const successViewEl = document.getElementById("success-view") as HTMLDivElement;
+successViewEl.addEventListener("mouseenter", () => {
+  if (dismissTimer) {
+    clearTimeout(dismissTimer);
+    dismissTimer = null;
+  }
+  // Freeze at current width
+  const computedWidth = timerProgress.getBoundingClientRect().width;
+  const parentWidth = timerProgress.parentElement!.getBoundingClientRect().width;
+  const pct = parentWidth > 0 ? (computedWidth / parentWidth) * 100 : 0;
+  timerProgress.style.transition = "none";
+  timerProgress.style.width = `${pct}%`;
+});
+
+successViewEl.addEventListener("mouseleave", () => {
+  // Resume from current position
+  const currentPct = parseFloat(timerProgress.style.width) || 0;
+  const remainingMs = (currentPct / 100) * AUTO_DISMISS_MS;
+  if (remainingMs <= 100) {
+    window.close();
+    return;
+  }
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      timerProgress.style.transition = `width ${remainingMs}ms linear`;
+      timerProgress.style.width = "0%";
+    });
+  });
+  dismissTimer = setTimeout(() => {
+    window.close();
+  }, remainingMs);
 });
 
 // ─── Init ────────────────────────────────────────────────────
