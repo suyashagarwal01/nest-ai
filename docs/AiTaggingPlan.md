@@ -193,12 +193,12 @@ The entire system runs on free tiers. The most powerful tagging comes from users
 ## Data Model Changes Summary
 
 ```sql
--- Phase 1 (migration 002)
+-- Phase 1
 ALTER TABLE bookmarks ADD COLUMN domain_context TEXT;
 ALTER TABLE bookmark_tags ADD COLUMN source TEXT DEFAULT 'ai_tier1';
 ALTER TABLE bookmark_tags ADD COLUMN confidence FLOAT DEFAULT 1.0;
 
--- Phase 2 (migration 003-004)
+-- Phase 2
 CREATE TABLE domain_intelligence (
   domain TEXT PRIMARY KEY,
   domain_type TEXT,
@@ -209,26 +209,18 @@ CREATE TABLE domain_intelligence (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Phase 3 (migration 005)
--- Uses url_tag_consensus, keyword_tag_patterns, tag_feedback, tag_aliases tables
--- (see PRD section 7 for full schema)
+-- Phase 3
+CREATE MATERIALIZED VIEW tag_patterns AS
+SELECT domain, path_pattern, tag_name,
+  COUNT(DISTINCT user_id) as user_count,
+  COUNT(*) as apply_count
+FROM bookmarks b
+JOIN bookmark_tags bt ON b.id = bt.bookmark_id
+JOIN tags t ON bt.tag_id = t.id
+GROUP BY domain, path_pattern, tag_name
+HAVING COUNT(DISTINCT user_id) >= 3;
 
--- Phase 4 (migration 008)
+-- Phase 4
 ALTER TABLE profiles ADD COLUMN tag_vocabulary JSONB DEFAULT '{}';
 ALTER TABLE profiles ADD COLUMN interest_vector JSONB DEFAULT '{}';
-
--- compute_interest_vectors() SQL function returns top 50 tags per user
--- Called daily by Edge Function, results stored in profiles.interest_vector
 ```
-
-## Implementation Status
-
-| Phase | Status | Migrations |
-|-------|--------|------------|
-| Phase 1: Structured Taxonomy | Complete | 002 |
-| Phase 2: Domain Intelligence | Complete | 003, 004 |
-| Phase 3: Collective Intelligence | Complete | 005 |
-| Phase 4a: Tag Vocabulary | Complete | 008 |
-| Phase 4b: Interest Boosting | Complete | 008 |
-| Phase 4c: Smart Suggestions | Complete | (client-side only) |
-| Phase 4d: Dashboard Analytics | Not started | — |

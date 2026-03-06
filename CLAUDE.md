@@ -1,4 +1,4 @@
-# inSpace — Project Context
+# Nest — Project Context
 
 ## What is this?
 A Chrome extension + web dashboard for smart bookmarking. Users save any webpage with one click, get an AI-tagged screenshot card, and access their collection from any device.
@@ -17,7 +17,7 @@ A Chrome extension + web dashboard for smart bookmarking. Users save any webpage
 
 ## Project Structure (Planned)
 ```
-inSpace v2/
+Nest v2/
 ├── CLAUDE.md
 ├── docs/
 │   └── PRD.md

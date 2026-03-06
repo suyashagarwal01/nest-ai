@@ -14,14 +14,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "inSpace — Smart Bookmarks",
+  title: "Nest — Smart Bookmarks",
   description:
     "Save any webpage with one click, get AI-powered tags and a screenshot, and access your collection from anywhere.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "inSpace",
+    title: "Nest",
   },
 };
 

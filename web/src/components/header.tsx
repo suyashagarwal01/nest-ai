@@ -48,7 +48,7 @@ export function Header({ view, onViewChange, onExport, userEmail }: HeaderProps)
     <header className="border-b border-neutral-200 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold tracking-tight">inSpace</h1>
+          <h1 className="text-lg font-bold tracking-tight">Nest</h1>
           <nav className="flex items-center gap-1">
             <Link
               href="/collections"

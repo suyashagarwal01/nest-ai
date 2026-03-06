@@ -23,7 +23,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-neutral-50">
       <div className="w-full max-w-sm p-8">
         <h1 className="text-3xl font-bold text-center mb-1 tracking-tight">
-          inSpace
+          Nest
         </h1>
         <p className="text-center text-neutral-500 mb-8 text-sm">
           Your bookmarks, organized by AI.

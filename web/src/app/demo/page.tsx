@@ -132,7 +132,7 @@ const MOCK_BOOKMARKS: (Bookmark & { bookmark_tags: { tags: Tag }[] })[] = [
     url: "https://supabase.com/docs",
     title: "Supabase Docs - Open Source Firebase Alternative",
     description: "An open source Firebase alternative. Start your project with a Postgres database.",
-    note: "Using for inSpace backend",
+    note: "Using for Nest backend",
     screenshot_url: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600&h=375&fit=crop",
     thumbnail_url: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400&h=250&fit=crop",
     favicon_url: "https://supabase.com/favicon.ico",

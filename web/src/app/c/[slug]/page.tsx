@@ -23,11 +23,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!collection) return { title: "Collection not found" };
 
   return {
-    title: `${collection.name} — inSpace Collection`,
-    description: collection.description || `A public bookmark collection on inSpace.`,
+    title: `${collection.name} — Nest Collection`,
+    description: collection.description || `A public bookmark collection on Nest.`,
     openGraph: {
-      title: `${collection.name} — inSpace`,
-      description: collection.description || `A public bookmark collection on inSpace.`,
+      title: `${collection.name} — Nest`,
+      description: collection.description || `A public bookmark collection on Nest.`,
     },
   };
 }

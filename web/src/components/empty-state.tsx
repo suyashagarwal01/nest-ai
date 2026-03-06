@@ -25,7 +25,7 @@ export function EmptyState({ hasSearch }: EmptyStateProps) {
             No bookmarks yet
           </h3>
           <p className="text-xs text-neutral-400 max-w-xs">
-            Install the inSpace Chrome extension and start saving pages. They
+            Install the Nest Chrome extension and start saving pages. They
             will appear here automatically.
           </p>
         </>

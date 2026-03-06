@@ -1,4 +1,4 @@
-# PRD: inSpace — Smart Bookmarking Chrome Extension
+# PRD: Nest — Smart Bookmarking Chrome Extension
 
 **Version:** 1.5
 **Author:** Product Lead
@@ -16,7 +16,7 @@ People save dozens of links daily — articles, tools, references, inspiration �
 - Manual tagging/organizing is friction nobody maintains.
 - No single place to search across everything you've saved.
 
-**inSpace** solves this by turning every save into a rich, AI-tagged, searchable card — with a screenshot for visual recall — accessible from any device.
+**Nest** solves this by turning every save into a rich, AI-tagged, searchable card — with a screenshot for visual recall — accessible from any device.
 
 ---
 
@@ -658,7 +658,7 @@ Daily cron (GitHub Actions)
 
 ## 13. Competitive Landscape
 
-| Product | Strength | inSpace Differentiator |
+| Product | Strength | Nest Differentiator |
 |---------|----------|------------------------|
 | Browser bookmarks | Built-in, zero friction | AI tagging, screenshots, cross-device dashboard |
 | Pocket | Read-later, clean UI | Visual screenshots, AI tags (Pocket has no auto-tagging) |
@@ -691,7 +691,7 @@ Daily cron (GitHub Actions)
 
 ## 15. Success Definition
 
-**inSpace Phase 1 is successful if:**
+**Nest Phase 1 is successful if:**
 - 500+ installs in 90 days.
 - Active users save ≥5 items/week on average.
 - ≥ 70% of auto-generated tags are accepted without editing.

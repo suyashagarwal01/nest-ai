@@ -1,6 +1,6 @@
 {
-  "name": "inSpace — Smart Bookmarks",
-  "short_name": "inSpace",
+  "name": "Nest — Smart Bookmarks",
+  "short_name": "Nest",
   "description": "Save any webpage with one click, get AI-powered tags and a screenshot, and access your collection from anywhere.",
   "start_url": "/",
   "display": "standalone",

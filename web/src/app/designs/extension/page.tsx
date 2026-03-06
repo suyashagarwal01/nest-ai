@@ -155,7 +155,7 @@ function AuthDefault() {
   return (
     <Frame label="Auth — Default">
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
-        <div style={{ fontSize: 24, fontWeight: 700, color: t.text, fontFamily: t.font, letterSpacing: -0.5 }}>inSpace</div>
+        <div style={{ fontSize: 24, fontWeight: 700, color: t.text, fontFamily: t.font, letterSpacing: -0.5 }}>Nest</div>
         <div style={{ fontSize: 13, color: t.textSec, fontFamily: t.font, marginBottom: 8 }}>Smart bookmarks, everywhere.</div>
         <Btn variant="google"><GoogleIcon />Sign in with Google</Btn>
       </div>
@@ -167,7 +167,7 @@ function AuthHover() {
   return (
     <Frame label="Auth — Button Hover">
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
-        <div style={{ fontSize: 24, fontWeight: 700, color: t.text, fontFamily: t.font, letterSpacing: -0.5 }}>inSpace</div>
+        <div style={{ fontSize: 24, fontWeight: 700, color: t.text, fontFamily: t.font, letterSpacing: -0.5 }}>Nest</div>
         <div style={{ fontSize: 13, color: t.textSec, fontFamily: t.font, marginBottom: 8 }}>Smart bookmarks, everywhere.</div>
         <Btn variant="google" hovered><GoogleIcon />Sign in with Google</Btn>
       </div>
@@ -179,7 +179,7 @@ function AuthLoading() {
   return (
     <Frame label="Auth — Loading">
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
-        <div style={{ fontSize: 24, fontWeight: 700, color: t.text, fontFamily: t.font, letterSpacing: -0.5 }}>inSpace</div>
+        <div style={{ fontSize: 24, fontWeight: 700, color: t.text, fontFamily: t.font, letterSpacing: -0.5 }}>Nest</div>
         <div style={{ fontSize: 13, color: t.textSec, fontFamily: t.font, marginBottom: 8 }}>Smart bookmarks, everywhere.</div>
         <Btn variant="google" disabled><GoogleIcon />Signing in...</Btn>
       </div>
@@ -191,7 +191,7 @@ function AuthError() {
   return (
     <Frame label="Auth — Error">
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 16px 16px" }}>
-        <div style={{ fontSize: 24, fontWeight: 700, color: t.text, fontFamily: t.font, letterSpacing: -0.5 }}>inSpace</div>
+        <div style={{ fontSize: 24, fontWeight: 700, color: t.text, fontFamily: t.font, letterSpacing: -0.5 }}>Nest</div>
         <div style={{ fontSize: 13, color: t.textSec, fontFamily: t.font, marginBottom: 8 }}>Smart bookmarks, everywhere.</div>
         <Btn variant="google"><GoogleIcon />Sign in with Google</Btn>
         <div style={{ fontSize: 12, color: t.error, fontFamily: t.font, textAlign: "center" as const }}>Sign-in was cancelled.</div>
@@ -554,7 +554,7 @@ export default function ExtensionDesignsPage() {
     <div style={{ minHeight: "100vh", background: "#F8F8F8", padding: 48, fontFamily: t.font }}>
       <div style={{ maxWidth: 1600, margin: "0 auto" }}>
         <div style={{ marginBottom: 40, textAlign: "center" as const }}>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: t.text, marginBottom: 4 }}>inSpace — Extension UI States</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: t.text, marginBottom: 4 }}>Nest — Extension UI States</h1>
           <p style={{ fontSize: 13, color: t.textTer }}>360px popup &middot; All screens &middot; All interaction states</p>
         </div>
 

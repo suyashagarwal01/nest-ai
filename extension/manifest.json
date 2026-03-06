@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "inSpace",
+  "name": "Nest",
   "version": "0.1.0",
   "description": "Smart bookmarking with screenshots and AI tagging",
   "permissions": [
@@ -45,7 +45,7 @@
         "default": "Ctrl+Shift+S",
         "mac": "Command+Shift+S"
       },
-      "description": "Save current page to inSpace"
+      "description": "Save current page to Nest"
     }
   }
 }
