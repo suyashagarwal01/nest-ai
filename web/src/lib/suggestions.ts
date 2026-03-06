@@ -10,7 +10,7 @@ export interface Suggestion {
 
 type BookmarkRow = Bookmark & { bookmark_tags: { tags: Tag }[] };
 
-const DISMISSED_KEY = "inspace_dismissed_suggestions";
+const DISMISSED_KEY = "nest_dismissed_suggestions";
 const DISMISS_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
 
 function getDismissed(): Set<string> {

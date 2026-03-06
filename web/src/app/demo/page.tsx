@@ -260,7 +260,7 @@ export default function DemoPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <Header view={view} onViewChange={setView} onExport={() => {}} userEmail="demo@inspace.app" />
+      <Header view={view} onViewChange={setView} onExport={() => {}} userEmail="demo@nest.app" />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex flex-col gap-4 mb-6">

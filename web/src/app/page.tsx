@@ -240,7 +240,7 @@ export default function DashboardPage() {
         [JSON.stringify({ bookmarks: data }, null, 2)],
         { type: "application/json" }
       );
-      filename = "inspace-bookmarks.json";
+      filename = "nest-bookmarks.json";
     } else {
       const columns = ["URL", "Title", "Category", "Domain", "Domain Context", "Tags", "Note", "Created At"];
       const escape = (v: string) => {
@@ -258,7 +258,7 @@ export default function DashboardPage() {
         [columns.join(",") + "\n" + rows.join("\n")],
         { type: "text/csv" }
       );
-      filename = "inspace-bookmarks.csv";
+      filename = "nest-bookmarks.csv";
     }
 
     const url = URL.createObjectURL(blob);

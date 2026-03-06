@@ -123,7 +123,7 @@ Users can edit, remove, or add tags manually. Removed community tags feed into t
 - **Delete:** Single delete with undo toast (5s). Bulk delete via multi-select.
 - **Pagination / infinite scroll:** Load 20 items at a time.
 
-**URL:** Hosted as a static site (e.g., `inspace.vercel.app`).
+**URL:** Hosted as a static site (e.g., `nest.vercel.app`).
 
 ### 5.4 Authentication & Sync
 
@@ -628,7 +628,7 @@ Daily cron (GitHub Actions)
 | AI tagging (primary) | Client-side rules + Chrome AI | Free |
 | AI tagging (fallback) | Google Gemini API | Free (1M tokens/day) |
 | Serverless functions | Supabase Edge Functions / Vercel | Free |
-| Domain | Vercel subdomain (inspace.vercel.app) | Free |
+| Domain | Vercel subdomain (nest.vercel.app) | Free |
 | Analytics | Vercel Analytics / Plausible (self-host) | Free |
 | CI/CD | GitHub Actions | Free (2,000 min/month) |
 

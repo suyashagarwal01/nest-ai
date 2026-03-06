@@ -5,7 +5,7 @@
 
 import { getSupabase } from "./supabase";
 
-const VOCAB_CACHE_KEY = "inspace_tag_vocabulary";
+const VOCAB_CACHE_KEY = "nest_tag_vocabulary";
 const VOCAB_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 interface VocabCache {

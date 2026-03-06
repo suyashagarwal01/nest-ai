@@ -1,5 +1,5 @@
 -- ============================================================
--- inSpace: Initial Schema
+-- Nest: Initial Schema
 -- ============================================================
 
 -- 1. Profiles (extends Supabase auth.users)

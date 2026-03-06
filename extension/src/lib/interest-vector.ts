@@ -5,7 +5,7 @@
 
 import { getSupabase } from "./supabase";
 
-const INTEREST_CACHE_KEY = "inspace_interest_vector";
+const INTEREST_CACHE_KEY = "nest_interest_vector";
 const INTEREST_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 interface InterestCache {

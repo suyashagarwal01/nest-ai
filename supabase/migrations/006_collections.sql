@@ -1,5 +1,5 @@
 -- ============================================================
--- inSpace: Collections, Sharing & Collaboration
+-- Nest: Collections, Sharing & Collaboration
 -- ============================================================
 
 -- 1. Create all tables first

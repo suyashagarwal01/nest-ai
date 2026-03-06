@@ -1,4 +1,4 @@
-const CACHE_NAME = "inspace-shell-v1";
+const CACHE_NAME = "nest-shell-v1";
 const SHELL_URLS = ["/"];
 
 self.addEventListener("install", (event) => {
