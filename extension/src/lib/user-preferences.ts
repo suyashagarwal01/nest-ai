@@ -114,7 +114,7 @@ export async function learnVocabulary(
   const len = Math.min(removed.length, added.length);
   for (let i = 0; i < len; i++) {
     if (removed[i] !== added[i]) {
-      pairs.push([removed[i], added[i]]);
+      pairs.push([removed[i]!, added[i]!]);
     }
   }
 

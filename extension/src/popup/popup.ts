@@ -55,8 +55,6 @@ let currentScreenshotUrl: string | null = null;
 let removedTopics: Set<string> = new Set();
 let removedCollectiveTags: Set<string> = new Set();
 let acceptedCollectiveTags: Set<string> = new Set();
-let currentDisplayTags: DisplayTag[] = [];
-let isDuplicate = false;
 let currentAISource: "ai_tier1" | "ai_tier2" | "ai_tier3" = "ai_tier1";
 
 // ─── View Management ─────────────────────────────────────────
@@ -243,7 +241,6 @@ function renderDisplayTags(
   displayTags: DisplayTag[]
 ) {
   currentTagResult = tagResult;
-  currentDisplayTags = displayTags;
 
   let html = "";
 
@@ -334,14 +331,12 @@ async function initSaveView() {
   favicon.onerror = () => { favicon.style.display = "none"; };
 
   // Check for duplicate (async, non-blocking)
-  isDuplicate = false;
   duplicateBanner.style.display = "none";
   btnSave.textContent = "Save";
   chrome.runtime.sendMessage(
     { type: "CHECK_DUPLICATE", url: currentMeta.url } as ExtensionMessage
   ).then((resp: { data: DuplicateResult } | undefined) => {
     if (resp?.data?.exists) {
-      isDuplicate = true;
       const savedDate = resp.data.bookmark?.created_at
         ? new Date(resp.data.bookmark.created_at).toLocaleDateString()
         : "";

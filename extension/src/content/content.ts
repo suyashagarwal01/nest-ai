@@ -34,7 +34,7 @@ function getPageMeta(): PageMeta {
   }
 
   // Article tags (Open Graph article:tag)
-  let articleTags: string[] = [];
+  const articleTags: string[] = [];
   try {
     const tagEls = document.querySelectorAll('meta[property="article:tag"]');
     tagEls.forEach((el) => {
@@ -65,11 +65,11 @@ function getPageMeta(): PageMeta {
   }
 
   // First 5 h1 + h2 headings
-  let headings: string[] = [];
+  const headings: string[] = [];
   try {
     const els = document.querySelectorAll("h1, h2");
     for (let i = 0; i < Math.min(els.length, 5); i++) {
-      const text = els[i].textContent?.trim();
+      const text = els[i]?.textContent?.trim();
       if (text) headings.push(text);
     }
   } catch {

@@ -107,7 +107,7 @@ export function matchPathPattern(
     const pathname = new URL(url).pathname;
     const parts = pathname.split("/").filter((p) => p.length > 1);
     if (parts.length === 0) return null;
-    firstSegment = parts[0].toLowerCase();
+    firstSegment = parts[0]!.toLowerCase();
   } catch {
     return null;
   }

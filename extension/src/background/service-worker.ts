@@ -77,7 +77,7 @@ async function captureScreenshot(): Promise<string | null> {
  * Convert a data URL to a Blob for upload.
  */
 function dataUrlToBlob(dataUrl: string): Blob {
-  const [header, base64] = dataUrl.split(",");
+  const [header, base64] = dataUrl.split(",") as [string, string];
   const mime = header.match(/:(.*?);/)?.[1] ?? "image/jpeg";
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
@@ -489,7 +489,7 @@ chrome.commands.onCommand.addListener(async (command) => {
         setTimeout(() => {
           chrome.action.setBadgeText({ text: "", tabId: tab.id });
         }, 2000);
-      } catch (err) {
+      } catch (_err) {
         chrome.action.setBadgeText({ text: "!", tabId: tab.id });
         chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
         setTimeout(() => {

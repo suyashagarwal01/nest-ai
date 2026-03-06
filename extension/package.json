@@ -6,14 +6,17 @@
   "scripts": {
     "dev": "vite build --watch --mode development",
     "build": "tsc && vite build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",
+    "eslint": "^10.0.2",
     "typescript": "^5.7.0",
+    "typescript-eslint": "^8.56.1",
     "vite": "^6.1.0"
   }
 }
