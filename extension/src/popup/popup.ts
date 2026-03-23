@@ -1,7 +1,9 @@
 import { getSupabase } from "../lib/supabase";
 import { generateTags, mergeWithCollective } from "../lib/tagger";
 import { generateTagsWithAI } from "../lib/ai-tagger-orchestrator";
-import { fetchConsensusTags } from "../lib/collective-intelligence";
+import { fetchConsensusTags, normalizeTag } from "../lib/collective-intelligence";
+import { initVocabCache, applyVocabulary } from "../lib/user-preferences";
+import { initInterestVector, boostWithInterests } from "../lib/interest-vector";
 import type { PageMeta, ExtensionMessage, DisplayTag, DuplicateResult, TagResult } from "../lib/types";
 
 // ─── DOM Elements ────────────────────────────────────────────
@@ -14,39 +16,37 @@ const successView = document.getElementById("success-view") as HTMLDivElement;
 const btnGoogleSignin = document.getElementById("btn-google-signin") as HTMLButtonElement;
 const authError = document.getElementById("auth-error") as HTMLParagraphElement;
 
-// Save — account bar
-const userAvatar = document.getElementById("user-avatar") as HTMLImageElement;
+// Header
+const userAvatarImg = document.getElementById("user-avatar-img") as HTMLImageElement;
+const userAvatarInitial = document.getElementById("user-avatar-initial") as HTMLSpanElement;
 const userName = document.getElementById("user-name") as HTMLSpanElement;
-const btnSignout = document.getElementById("btn-signout") as HTMLButtonElement;
-
-// Save — duplicate banner
-const duplicateBanner = document.getElementById("duplicate-banner") as HTMLDivElement;
-const duplicateDate = document.getElementById("duplicate-date") as HTMLSpanElement;
+const btnDashboardHeader = document.getElementById("btn-dashboard-header") as HTMLButtonElement;
 
 // Save — form
 const inputTitle = document.getElementById("input-title") as HTMLInputElement;
+const titleClear = document.getElementById("title-clear") as HTMLButtonElement;
 const displayUrl = document.getElementById("display-url") as HTMLSpanElement;
-const favicon = document.getElementById("favicon") as HTMLImageElement;
 const tagsPreview = document.getElementById("tags-preview") as HTMLDivElement;
 const inputUserTags = document.getElementById("input-user-tags") as HTMLInputElement;
-const toggleScreenshot = document.getElementById("toggle-screenshot") as HTMLInputElement;
 const screenshotPreview = document.getElementById("screenshot-preview") as HTMLDivElement;
 const screenshotImg = document.getElementById("screenshot-img") as HTMLImageElement;
 const btnSave = document.getElementById("btn-save") as HTMLButtonElement;
-const saveStatus = document.getElementById("save-status") as HTMLDivElement;
-const btnDashboardFooter = document.getElementById("btn-dashboard-footer") as HTMLButtonElement;
+const duplicateBanner = document.getElementById("duplicate-banner") as HTMLDivElement;
+const skeletonLoader = document.getElementById("skeleton-loader") as HTMLDivElement;
+const contentLoaded = document.getElementById("content-loaded") as HTMLDivElement;
+const btnStickyWrap = document.getElementById("btn-sticky-wrap") as HTMLDivElement;
+
+// Status states
+const statusSaving = document.getElementById("status-saving") as HTMLDivElement;
+const statusError = document.getElementById("status-error") as HTMLDivElement;
+const statusSuccess = document.getElementById("status-success") as HTMLDivElement;
+const errorText = document.getElementById("error-text") as HTMLSpanElement;
 
 // Success
-const successLoading = document.getElementById("success-loading") as HTMLDivElement;
-const successSaved = document.getElementById("success-saved") as HTMLDivElement;
 const btnOpenDashboard = document.getElementById("btn-open-dashboard") as HTMLButtonElement;
 const timerProgress = document.getElementById("timer-progress") as HTMLDivElement;
 const successScreenshot = document.getElementById("success-screenshot") as HTMLDivElement;
 const successScreenshotImg = document.getElementById("success-screenshot-img") as HTMLImageElement;
-const successTitle = document.getElementById("success-title") as HTMLParagraphElement;
-const successFavicon = document.getElementById("success-favicon") as HTMLImageElement;
-const successDomain = document.getElementById("success-domain") as HTMLSpanElement;
-const successTags = document.getElementById("success-tags") as HTMLDivElement;
 
 // ─── State ───────────────────────────────────────────────────
 
@@ -56,6 +56,9 @@ let removedTopics: Set<string> = new Set();
 let removedCollectiveTags: Set<string> = new Set();
 let acceptedCollectiveTags: Set<string> = new Set();
 let currentAISource: "ai_tier1" | "ai_tier2" | "ai_tier3" = "ai_tier1";
+let isDuplicate = false;
+let savedTitle = "";
+let savedTags: Set<string> = new Set();
 
 // ─── View Management ─────────────────────────────────────────
 
@@ -73,15 +76,31 @@ async function populateAccountBar(): Promise<void> {
   if (!user) return;
 
   const meta = user.user_metadata ?? {};
-  const name = meta.full_name || meta.name || user.email || "User";
+  const fullName = meta.full_name || meta.name || user.email || "User";
   const avatarUrl = meta.avatar_url || meta.picture || "";
 
-  userName.textContent = name;
+  // Show first name only
+  const firstName = fullName.includes("@")
+    ? fullName.split("@")[0]
+    : fullName.split(" ")[0];
+
+  userName.textContent = firstName;
+
+  // Avatar: show profile picture if available, initials as fallback
+  const initial = firstName.charAt(0).toUpperCase();
   if (avatarUrl) {
-    userAvatar.src = avatarUrl;
-    userAvatar.style.display = "block";
+    userAvatarImg.src = avatarUrl;
+    userAvatarImg.style.display = "block";
+    userAvatarInitial.style.display = "none";
+    userAvatarImg.onerror = () => {
+      userAvatarImg.style.display = "none";
+      userAvatarInitial.style.display = "";
+      userAvatarInitial.textContent = initial;
+    };
   } else {
-    userAvatar.style.display = "none";
+    userAvatarImg.style.display = "none";
+    userAvatarInitial.style.display = "";
+    userAvatarInitial.textContent = initial;
   }
 }
 
@@ -101,7 +120,6 @@ btnGoogleSignin.addEventListener("click", async () => {
     const supabase = getSupabase();
     const redirectUrl = chrome.identity.getRedirectURL();
 
-    // Step 1: Get the OAuth URL from Supabase (skip browser redirect)
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -116,21 +134,18 @@ btnGoogleSignin.addEventListener("click", async () => {
       return;
     }
 
-    // Step 2: Open Chrome's auth flow (handles the OAuth popup properly)
     const responseUrl = await chrome.identity.launchWebAuthFlow({
       url: data.url,
       interactive: true,
     });
 
     if (!responseUrl) {
-      authError.textContent = "Sign-in was cancelled.";
+      authError.textContent = "Sign-in was cancelled!";
       btnGoogleSignin.disabled = false;
       return;
     }
 
-    // Step 3: Parse tokens from the response URL hash fragment
     const url = new URL(responseUrl);
-    // Supabase returns tokens in the hash fragment
     const hashParams = new URLSearchParams(url.hash.substring(1));
     const accessToken = hashParams.get("access_token");
     const refreshToken = hashParams.get("refresh_token");
@@ -141,7 +156,6 @@ btnGoogleSignin.addEventListener("click", async () => {
       return;
     }
 
-    // Step 4: Set the session in Supabase client
     const { error: sessionError } = await supabase.auth.setSession({
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -153,7 +167,6 @@ btnGoogleSignin.addEventListener("click", async () => {
       return;
     }
 
-    // Success — show save view
     await initSaveView();
   } catch (err) {
     authError.textContent = err instanceof Error ? err.message : "Sign-in failed.";
@@ -161,13 +174,54 @@ btnGoogleSignin.addEventListener("click", async () => {
   }
 });
 
-btnSignout.addEventListener("click", async () => {
-  const supabase = getSupabase();
-  await supabase.auth.signOut();
-  showView("auth");
-  btnGoogleSignin.disabled = false;
-  authError.textContent = "";
+// ─── Title Input Clear Button ─────────────────────────────────
+
+function updateTitleClear() {
+  titleClear.classList.toggle("hidden", !inputTitle.value);
+}
+
+inputTitle.addEventListener("input", () => {
+  updateTitleClear();
+  checkDuplicateChanges();
 });
+titleClear.addEventListener("click", () => {
+  inputTitle.value = "";
+  updateTitleClear();
+  checkDuplicateChanges();
+  inputTitle.focus();
+});
+inputUserTags.addEventListener("input", checkDuplicateChanges);
+
+function getCurrentTagNames(): Set<string> {
+  const tags = new Set<string>();
+  // Get topic/custom tags from data-topic attributes (reliable, no text parsing)
+  tagsPreview.querySelectorAll(".ext-tag-remove").forEach((btn) => {
+    const topic = (btn as HTMLButtonElement).dataset.topic;
+    if (topic) tags.add(topic);
+  });
+  // Include user-typed tags from input
+  inputUserTags.value
+    .split(",")
+    .map((t) => t.trim().toLowerCase())
+    .filter((t) => t.length > 0)
+    .forEach((t) => tags.add(t));
+  return tags;
+}
+
+function setsEqual(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const v of a) {
+    if (!b.has(v)) return false;
+  }
+  return true;
+}
+
+function checkDuplicateChanges() {
+  if (!isDuplicate) return;
+  const titleChanged = inputTitle.value !== savedTitle;
+  const tagsChanged = !setsEqual(getCurrentTagNames(), savedTags);
+  btnSave.disabled = !(titleChanged || tagsChanged);
+}
 
 // ─── Page Meta & Screenshot ──────────────────────────────────
 
@@ -182,7 +236,6 @@ async function getPageMeta(): Promise<PageMeta | null> {
 
     return response?.data ?? null;
   } catch {
-    // Content script may not be injected (e.g., chrome:// pages)
     return null;
   }
 }
@@ -199,86 +252,80 @@ async function captureScreenshotPreview(): Promise<string | null> {
   }
 }
 
+// ─── Tag Normalization (match service worker pipeline) ────
+
+function normalizeTopics(topics: string[]): string[] {
+  let result = topics.map(normalizeTag);
+  result = applyVocabulary(result);
+  result = boostWithInterests(result);
+  // Deduplicate (normalization may merge names)
+  const seen = new Set<string>();
+  return result.filter((t) => {
+    if (seen.has(t)) return false;
+    seen.add(t);
+    return true;
+  });
+}
+
 // ─── Tag Rendering ───────────────────────────────────────
 
-let currentTagResult: ReturnType<typeof generateTags> | null = null;
-
 function renderTagsPreview(tagResult: ReturnType<typeof generateTags>) {
-  currentTagResult = tagResult;
+  // Normalize topics to match what the service worker saves
+  tagResult.topics = normalizeTopics(tagResult.topics);
+
   let html = "";
-  html += `<span class="tag tag-category">${tagResult.category}</span>`;
+  html += `<span class="ext-tag ext-tag--category">${tagResult.category}</span>`;
   if (tagResult.domainContext) {
-    html += `<span class="tag tag-domain">${tagResult.domainContext}</span>`;
+    html += `<span class="ext-tag ext-tag--domain">${tagResult.domainContext}</span>`;
   }
   html += tagResult.topics
     .filter((t) => !removedTopics.has(t))
     .map(
       (t) =>
-        `<span class="tag tag-topic">${t}<button class="tag-remove" data-topic="${t}" aria-label="Remove ${t}">&times;</button></span>`
+        `<span class="ext-tag ext-tag--custom">${t}<button class="ext-tag-remove" data-topic="${t}" aria-label="Remove ${t}">&times;</button></span>`
     )
     .join("");
   tagsPreview.innerHTML = html;
 
-  // Attach remove handlers
-  tagsPreview.querySelectorAll(".tag-remove").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const topic = (btn as HTMLButtonElement).dataset.topic;
-      if (topic) {
-        removedTopics.add(topic);
-        renderTagsPreview(tagResult);
-      }
-    });
-  });
+  attachTagRemoveHandlers(tagResult);
+  checkDuplicateChanges();
 }
 
-/**
- * Render unified display tags (Tier 1 + collective consensus + keyword patterns).
- * Replaces the basic topic rendering with source-aware styling.
- */
 function renderDisplayTags(
   tagResult: ReturnType<typeof generateTags>,
   displayTags: DisplayTag[]
 ) {
-  currentTagResult = tagResult;
+  // Normalize topics to match what the service worker saves
+  tagResult.topics = normalizeTopics(tagResult.topics);
+  // Also normalize display tag names
+  for (const dt of displayTags) {
+    dt.name = normalizeTag(dt.name);
+  }
 
   let html = "";
 
-  // Category + domain context (unchanged)
-  html += `<span class="tag tag-category">${tagResult.category}</span>`;
+  html += `<span class="ext-tag ext-tag--category">${tagResult.category}</span>`;
   if (tagResult.domainContext) {
-    html += `<span class="tag tag-domain">${tagResult.domainContext}</span>`;
+    html += `<span class="ext-tag ext-tag--domain">${tagResult.domainContext}</span>`;
   }
 
-  // Display tags with source-aware styling
   for (const dt of displayTags) {
-    // Skip removed tags based on source
     if (dt.source === "tier1" && removedTopics.has(dt.name)) continue;
     if (
       (dt.source === "collective_consensus" || dt.source === "collective_keyword") &&
       removedCollectiveTags.has(dt.name)
     ) continue;
 
-    const isCollective = dt.source === "collective_consensus" || dt.source === "collective_keyword";
-    const tagClasses = [
-      "tag",
-      "tag-topic",
-      isCollective ? "tag-collective" : "",
-      dt.isSuggested ? "tag-suggested" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
+    const dataSource = (dt.source === "collective_consensus" || dt.source === "collective_keyword")
+      ? "collective" : "tier1";
 
-    const tooltip = isCollective ? ' title="Community tag"' : "";
-    const dataSource = isCollective ? "collective" : "tier1";
-
-    html += `<span class="${tagClasses}"${tooltip}>${dt.name}<button class="tag-remove" data-topic="${dt.name}" data-source="${dataSource}" aria-label="Remove ${dt.name}">&times;</button></span>`;
+    html += `<span class="ext-tag ext-tag--custom">${dt.name}<button class="ext-tag-remove" data-topic="${dt.name}" data-source="${dataSource}" aria-label="Remove ${dt.name}">&times;</button></span>`;
   }
 
   tagsPreview.innerHTML = html;
 
   // Attach remove handlers
-  tagsPreview.querySelectorAll(".tag-remove").forEach((btn) => {
+  tagsPreview.querySelectorAll(".ext-tag-remove").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const topic = (btn as HTMLButtonElement).dataset.topic;
@@ -290,6 +337,21 @@ function renderDisplayTags(
           removedTopics.add(topic);
         }
         renderDisplayTags(tagResult, displayTags);
+        checkDuplicateChanges();
+      }
+    });
+  });
+}
+
+function attachTagRemoveHandlers(tagResult: ReturnType<typeof generateTags>) {
+  tagsPreview.querySelectorAll(".ext-tag-remove").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const topic = (btn as HTMLButtonElement).dataset.topic;
+      if (topic) {
+        removedTopics.add(topic);
+        renderTagsPreview(tagResult);
+        checkDuplicateChanges();
       }
     });
   });
@@ -297,19 +359,66 @@ function renderDisplayTags(
 
 // ─── Save View Init ──────────────────────────────────────────
 
+/** Show skeleton, hide real content and button */
+function showSkeleton() {
+  skeletonLoader.style.display = "flex";
+  skeletonLoader.classList.remove("ext-hiding");
+  contentLoaded.style.display = "none";
+  contentLoaded.classList.remove("ext-fade-in");
+  btnStickyWrap.style.display = "none";
+  btnStickyWrap.classList.remove("ext-fade-in");
+}
+
+/** Fade out skeleton, then fade in real content and button */
+function revealContent() {
+  // Fade out skeleton
+  skeletonLoader.classList.add("ext-hiding");
+  setTimeout(() => {
+    skeletonLoader.style.display = "none";
+    // Fade in content
+    contentLoaded.style.display = "flex";
+    contentLoaded.classList.add("ext-fade-in");
+    btnStickyWrap.style.display = "block";
+    btnStickyWrap.classList.add("ext-fade-in");
+  }, 200);
+}
+
+/** Mark body as ready — triggers the entrance animation */
+function markReady() {
+  document.body.classList.add("ext-ready");
+}
+
+/** Fade out body then close popup */
+function closePopup() {
+  document.body.classList.remove("ext-ready");
+  document.body.classList.add("ext-closing");
+  setTimeout(() => window.close(), 200);
+}
+
 async function initSaveView() {
+  saveView.classList.remove("ext-hiding");
   showView("save");
-  saveStatus.textContent = "Loading page info...";
+  showSkeleton();
   btnSave.disabled = true;
 
-  // Populate account bar
+  // Reset button and duplicate banner
+  isDuplicate = false;
+  savedTitle = "";
+  savedTags = new Set();
+  duplicateBanner.style.display = "none";
+  btnSave.textContent = "Save to Nest";
+  btnSave.classList.remove("ext-btn-save--update");
+
+  // Populate account bar (shows immediately in header, above skeleton)
   await populateAccountBar();
+
+  // Trigger entrance animation now that layout is ready
+  markReady();
 
   // Get page meta from content script
   currentMeta = await getPageMeta();
 
   if (!currentMeta) {
-    // Fallback: get basic info from tabs API
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     currentMeta = {
       url: tab?.url ?? "",
@@ -319,51 +428,43 @@ async function initSaveView() {
       ogImage: "",
       metaKeywords: [],
       articleTags: [],
+      ogType: null,
       jsonLdType: null,
       headings: [],
     };
   }
 
-  // Fill form
-  inputTitle.value = currentMeta.title;
-  displayUrl.textContent = currentMeta.url;
-  favicon.src = currentMeta.favicon;
-  favicon.onerror = () => { favicon.style.display = "none"; };
+  const meta = currentMeta;
 
-  // Check for duplicate (async, non-blocking)
-  duplicateBanner.style.display = "none";
-  btnSave.textContent = "Save";
-  chrome.runtime.sendMessage(
-    { type: "CHECK_DUPLICATE", url: currentMeta.url } as ExtensionMessage
-  ).then((resp: { data: DuplicateResult } | undefined) => {
-    if (resp?.data?.exists) {
-      const savedDate = resp.data.bookmark?.created_at
-        ? new Date(resp.data.bookmark.created_at).toLocaleDateString()
-        : "";
-      duplicateDate.textContent = savedDate ? `on ${savedDate}` : "";
-      duplicateBanner.style.display = "flex";
-      btnSave.textContent = "Update";
-    }
-  }).catch(() => {
-    // Duplicate check failed — proceed normally
-  });
+  // Fill form (hidden behind skeleton)
+  inputTitle.value = meta.title;
+  updateTitleClear();
+  displayUrl.textContent = meta.url;
 
-  // Check offline queue status
-  chrome.runtime.sendMessage(
-    { type: "GET_QUEUE_STATUS" } as ExtensionMessage
-  ).then((resp: { count: number } | undefined) => {
-    if (resp?.count && resp.count > 0) {
-      saveStatus.innerHTML = `<span class="save-queued-info">${resp.count} bookmark(s) pending sync</span>`;
-    }
-  }).catch(() => {});
-
-  // Generate tags with AI orchestration (Tier 1 → 2 → 3)
+  // Reset tag state
   removedTopics = new Set();
   removedCollectiveTags = new Set();
   acceptedCollectiveTags = new Set();
   currentAISource = "ai_tier1";
 
-  // Helper to fetch consensus and merge with a given tagResult
+  // Run critical async ops in parallel behind the skeleton:
+  // 1. Duplicate check
+  // 2. Tier 1 tag generation (sync, but wrapped in AI orchestrator)
+  // 3. Screenshot capture
+  const duplicateCheck = chrome.runtime.sendMessage(
+    { type: "CHECK_DUPLICATE", url: meta.url } as ExtensionMessage
+  ).then((resp: { data: DuplicateResult } | undefined) => {
+    if (resp?.data?.exists) {
+      isDuplicate = true;
+      savedTitle = resp.data.bookmark?.title ?? inputTitle.value;
+      savedTags = new Set<string>(resp.data.tags ?? []);
+      duplicateBanner.style.display = "flex";
+      btnSave.textContent = "Update";
+      btnSave.classList.add("ext-btn-save--update");
+      btnSave.disabled = true;
+    }
+  }).catch(() => {});
+
   const fetchAndMergeConsensus = (tagResult: TagResult) => {
     if (!currentMeta) return;
     fetchConsensusTags(currentMeta.url).then((consensusTags) => {
@@ -379,78 +480,64 @@ async function initSaveView() {
     }).catch(() => {});
   };
 
-  const metaForAI = currentMeta;
+  // Tier 1 tags render synchronously inside onTier1 callback
+  let tier1Ready: () => void;
+  const tier1Promise = new Promise<void>((resolve) => { tier1Ready = resolve; });
+
   generateTagsWithAI(
-    metaForAI,
-    // onTier1 — immediate render
+    meta,
     ({ tagResult, source }) => {
       currentAISource = source;
       renderTagsPreview(tagResult);
       fetchAndMergeConsensus(tagResult);
+      tier1Ready();
     },
-    // onUpgrade — AI tags replace Tier 1
     ({ tagResult, source }) => {
+      // AI upgrade (Tier 2/3) — updates in place after reveal, which is fine
       currentAISource = source;
       removedTopics = new Set();
       acceptedCollectiveTags = new Set();
       renderTagsPreview(tagResult);
       fetchAndMergeConsensus(tagResult);
     }
-  ).catch(() => {
-    // AI orchestration failed — Tier 1 already rendered
+  ).catch(() => {});
+
+  const screenshotCapture = captureScreenshotPreview().then((url) => {
+    currentScreenshotUrl = url;
+    if (url) {
+      screenshotImg.src = url;
+      screenshotPreview.classList.remove("hidden");
+    } else {
+      screenshotPreview.classList.add("hidden");
+    }
   });
 
-  // Capture screenshot preview
-  currentScreenshotUrl = await captureScreenshotPreview();
-  if (currentScreenshotUrl) {
-    screenshotImg.src = currentScreenshotUrl;
-    screenshotPreview.classList.remove("hidden");
-  } else {
-    screenshotPreview.classList.add("hidden");
-    toggleScreenshot.checked = false;
-  }
+  // Wait for all critical ops before revealing
+  await Promise.all([duplicateCheck, tier1Promise, screenshotCapture]);
 
-  saveStatus.textContent = "";
-  btnSave.disabled = false;
+  // Reveal content and enable button
+  revealContent();
+  if (isDuplicate) {
+    checkDuplicateChanges();
+  } else {
+    btnSave.disabled = false;
+  }
 }
-
-// ─── Toggle screenshot preview ───────────────────────────────
-
-toggleScreenshot.addEventListener("change", () => {
-  if (toggleScreenshot.checked && currentScreenshotUrl) {
-    screenshotPreview.classList.remove("hidden");
-  } else {
-    screenshotPreview.classList.add("hidden");
-  }
-});
 
 // ─── Save ────────────────────────────────────────────────────
-
-function showSaveError(message: string) {
-  saveStatus.innerHTML = `<span class="save-error"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>${message}</span>`;
-}
-
-function showSaveQueued(pendingCount: number) {
-  saveStatus.innerHTML = `<span class="save-queued">Saved offline — will sync when online (${pendingCount} pending)</span>`;
-}
 
 btnSave.addEventListener("click", async () => {
   if (!currentMeta) return;
 
   btnSave.disabled = true;
-
-  // Immediately switch to success view with loading spinner
   showSavingState();
 
   try {
-    // Send save to background service worker
-    // Parse comma-separated user tags
     const userTags = inputUserTags.value
       .split(",")
       .map((t) => t.trim().toLowerCase())
       .filter((t) => t.length > 0);
 
-    // Compute final accepted collective tags (shown minus removed)
     const finalAccepted = [...acceptedCollectiveTags].filter(
       (t) => !removedCollectiveTags.has(t)
     );
@@ -461,7 +548,7 @@ btnSave.addEventListener("click", async () => {
         url: currentMeta.url,
         title: inputTitle.value,
         userTags,
-        captureScreenshot: toggleScreenshot.checked,
+        captureScreenshot: true,
         meta: currentMeta,
         removedTopics: [...removedTopics],
         acceptedCollectiveTags: finalAccepted,
@@ -471,24 +558,15 @@ btnSave.addEventListener("click", async () => {
     } as ExtensionMessage);
 
     if (response?.success) {
-      showSuccessWithPreview();
+      showSuccessState();
     } else if (response?.error === "__OFFLINE__") {
-      // Go back to save view for offline state
       showView("save");
-      const queueResp = await chrome.runtime.sendMessage({
-        type: "GET_QUEUE_STATUS",
-      } as ExtensionMessage);
-      showSaveQueued(queueResp?.count ?? 1);
       btnSave.disabled = false;
     } else {
-      showView("save");
-      showSaveError(response?.error ?? "Failed to save.");
-      btnSave.disabled = false;
+      showErrorState(response?.error ?? "Failed to save.");
     }
   } catch (err) {
-    showView("save");
-    showSaveError(err instanceof Error ? err.message : "Failed to save.");
-    btnSave.disabled = false;
+    showErrorState(err instanceof Error ? err.message : "Failed to save.");
   }
 });
 
@@ -497,76 +575,63 @@ btnSave.addEventListener("click", async () => {
 function openDashboard() {
   const dashboardUrl = import.meta.env.VITE_DASHBOARD_URL ?? "http://localhost:3000";
   chrome.tabs.create({ url: dashboardUrl });
-  window.close();
+  closePopup();
 }
 
 btnOpenDashboard.addEventListener("click", openDashboard);
-btnDashboardFooter.addEventListener("click", openDashboard);
+btnDashboardHeader.addEventListener("click", openDashboard);
 
-// ─── Success with Preview + Auto-Dismiss ─────────────────────
-
-const AUTO_DISMISS_MS = 2000;
-let dismissTimer: ReturnType<typeof setTimeout> | null = null;
+// ─── Status States ───────────────────────────────────────────
 
 function showSavingState() {
-  // Show success view with loading spinner, hide saved content
-  successLoading.style.display = "flex";
-  successSaved.style.display = "none";
-  timerProgress.style.transition = "none";
-  timerProgress.style.width = "0%";
-  showView("success");
+  // Fade out save view, then swap to saving state
+  saveView.classList.add("ext-hiding");
+  setTimeout(() => {
+    statusSaving.style.display = "flex";
+    statusError.style.display = "none";
+    statusSuccess.style.display = "none";
+    showView("success");
+    // Fade in the status view
+    successView.classList.add("ext-fade-in");
+  }, 250);
 }
 
-function showSuccessWithPreview() {
-  // Switch from loading to saved content
-  successLoading.style.display = "none";
-  successSaved.style.display = "flex";
+function showErrorState(message: string) {
+  // Crossfade from saving → error
+  statusSaving.style.display = "none";
+  statusError.style.display = "flex";
+  statusError.classList.add("ext-fade-in");
+  statusSuccess.style.display = "none";
+  errorText.textContent = message;
+  showView("success");
 
-  // Populate preview from current save data
-  successTitle.textContent = inputTitle.value || currentMeta?.url || "";
+  // Allow going back to save view by clicking
+  statusError.onclick = () => {
+    saveView.classList.remove("ext-hiding");
+    showView("save");
+    btnSave.disabled = false;
+    statusError.onclick = null;
+  };
+}
 
-  // Domain
-  try {
-    const hostname = new URL(currentMeta?.url ?? "").hostname;
-    successDomain.textContent = hostname;
-  } catch {
-    successDomain.textContent = "";
-  }
+function showSuccessState() {
+  // Crossfade from saving → success
+  statusSaving.style.display = "none";
+  statusError.style.display = "none";
+  statusSuccess.style.display = "flex";
+  statusSuccess.classList.add("ext-fade-in");
 
-  // Favicon
-  if (currentMeta?.favicon) {
-    successFavicon.src = currentMeta.favicon;
-    successFavicon.style.display = "block";
-    successFavicon.onerror = () => { successFavicon.style.display = "none"; };
-  } else {
-    successFavicon.style.display = "none";
-  }
-
-  // Screenshot
-  if (currentScreenshotUrl && toggleScreenshot.checked) {
+  // Screenshot thumbnail
+  if (currentScreenshotUrl) {
     successScreenshotImg.src = currentScreenshotUrl;
     successScreenshot.classList.remove("hidden");
   } else {
     successScreenshot.classList.add("hidden");
   }
 
-  // Tags
-  let tagsHtml = "";
-  if (currentTagResult) {
-    if (currentTagResult.category && currentTagResult.category !== "Other") {
-      tagsHtml += `<span class="tag tag-category">${currentTagResult.category}</span>`;
-    }
-    const topics = currentTagResult.topics.filter((t) => !removedTopics.has(t));
-    for (const t of topics.slice(0, 3)) {
-      tagsHtml += `<span class="tag tag-topic">${t}</span>`;
-    }
-  }
-  successTags.innerHTML = tagsHtml;
-
-  // Show view
   showView("success");
 
-  // Start timer bar animation: reset to full, then animate to 0
+  // Start timer bar animation
   timerProgress.style.transition = "none";
   timerProgress.style.width = "100%";
   requestAnimationFrame(() => {
@@ -576,21 +641,25 @@ function showSuccessWithPreview() {
     });
   });
 
-  // Auto-close popup when timer finishes
+  // Auto-close popup
   if (dismissTimer) clearTimeout(dismissTimer);
   dismissTimer = setTimeout(() => {
-    window.close();
+    closePopup();
   }, AUTO_DISMISS_MS);
 }
 
-// Pause timer on hover (user is reading/clicking)
+// ─── Auto-Dismiss Timer ──────────────────────────────────────
+
+const AUTO_DISMISS_MS = 3000;
+let dismissTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Pause timer on hover
 const successViewEl = document.getElementById("success-view") as HTMLDivElement;
 successViewEl.addEventListener("mouseenter", () => {
   if (dismissTimer) {
     clearTimeout(dismissTimer);
     dismissTimer = null;
   }
-  // Freeze at current width
   const computedWidth = timerProgress.getBoundingClientRect().width;
   const parentWidth = timerProgress.parentElement!.getBoundingClientRect().width;
   const pct = parentWidth > 0 ? (computedWidth / parentWidth) * 100 : 0;
@@ -599,11 +668,10 @@ successViewEl.addEventListener("mouseenter", () => {
 });
 
 successViewEl.addEventListener("mouseleave", () => {
-  // Resume from current position
   const currentPct = parseFloat(timerProgress.style.width) || 0;
   const remainingMs = (currentPct / 100) * AUTO_DISMISS_MS;
   if (remainingMs <= 100) {
-    window.close();
+    closePopup();
     return;
   }
   requestAnimationFrame(() => {
@@ -613,7 +681,7 @@ successViewEl.addEventListener("mouseleave", () => {
     });
   });
   dismissTimer = setTimeout(() => {
-    window.close();
+    closePopup();
   }, remainingMs);
 });
 
@@ -621,11 +689,15 @@ successViewEl.addEventListener("mouseleave", () => {
 
 (async () => {
   try {
+    // Initialize caches so tag normalization matches the service worker
+    await Promise.all([initVocabCache(), initInterestVector()]);
+
     const isAuthed = await checkAuth();
     if (isAuthed) {
       await initSaveView();
     } else {
       showView("auth");
+      markReady();
     }
   } catch {
     showView("auth");

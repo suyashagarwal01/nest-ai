@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Masonry from "react-masonry-css";
+import { Upload } from "lucide-react";
+import Link from "next/link";
 import { Header } from "@/components/header";
 import { SearchBar } from "@/components/search-bar";
 import { CategoryTabs } from "@/components/category-tabs";
-import { TagFilter } from "@/components/tag-filter";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { BookmarkListItem } from "@/components/bookmark-list-item";
+import { ViewSwitcher } from "@/components/view-switcher";
+import { ToastProvider } from "@/components/toast";
 import { EmptyState } from "@/components/empty-state";
 import type { Bookmark, Tag } from "@/lib/types";
 
@@ -194,14 +198,20 @@ const MOCK_BOOKMARKS: (Bookmark & { bookmark_tags: { tags: Tag }[] })[] = [
   },
 ];
 
+const masonryBreakpoints = {
+  default: 4,
+  1100: 3,
+  768: 2,
+  480: 1,
+};
+
 // ── Demo Page ──────────────────────────────────────────────
 
 export default function DemoPage() {
   const [bookmarks, setBookmarks] = useState(MOCK_BOOKMARKS);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [view, setView] = useState<"grid" | "list" | "grouped">("grid");
+  const [view, setView] = useState<"grid" | "list">("grid");
 
   const allCategories = useMemo(() => {
     const cats = new Set<string>();
@@ -209,24 +219,10 @@ export default function DemoPage() {
     return Array.from(cats).sort();
   }, [bookmarks]);
 
-  const allTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    bookmarks.forEach((b) => {
-      b.bookmark_tags?.forEach((bt) => { if (bt.tags?.name) tagSet.add(bt.tags.name); });
-    });
-    return Array.from(tagSet).sort();
-  }, [bookmarks]);
-
   const filtered = useMemo(() => {
     let result = bookmarks;
     if (selectedCategory) {
       result = result.filter((b) => b.category === selectedCategory);
-    }
-    if (selectedTags.length > 0) {
-      result = result.filter((b) => {
-        const bt = b.bookmark_tags?.map((t) => t.tags?.name).filter(Boolean) ?? [];
-        return selectedTags.some((t) => bt.includes(t));
-      });
     }
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -240,7 +236,7 @@ export default function DemoPage() {
       );
     }
     return result;
-  }, [bookmarks, selectedCategory, selectedTags, search]);
+  }, [bookmarks, selectedCategory, search]);
 
   function handleDelete(id: string) {
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
@@ -250,35 +246,38 @@ export default function DemoPage() {
     setBookmarks((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
   }
 
-  function toggleTag(tag: string) {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  }
-
-  const hasFilters = !!search || !!selectedCategory || selectedTags.length > 0;
+  const hasFilters = !!search || !!selectedCategory;
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <Header view={view} onViewChange={setView} onExport={() => {}} userEmail="demo@nest.app" />
+    <div className="dashboard-page">
+      <Header userEmail="demo@nest.app" />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <div className="flex flex-col gap-4 mb-6">
-          <SearchBar value={search} onChange={setSearch} />
-          <CategoryTabs
-            categories={allCategories}
-            selected={selectedCategory}
-            onSelect={setSelectedCategory}
-          />
-          <TagFilter
-            tags={allTags}
-            selected={selectedTags}
-            onToggle={toggleTag}
-            onClear={() => setSelectedTags([])}
-          />
+      <div className="dashboard-content">
+        <div className="dashboard-filters">
+          <div className="dashboard-filter-search">
+            <SearchBar value={search} onChange={setSearch} />
+          </div>
+          <div className="dashboard-actions">
+            <Link href="/import" className="import-btn">
+              <Upload size={16} />
+              Import
+            </Link>
+            <div className="dashboard-separator" />
+            <ViewSwitcher view={view} onChange={setView} />
+          </div>
         </div>
 
-        <p className="text-xs text-neutral-400 mb-4">
+        {allCategories.length > 0 && (
+          <div className="dashboard-category-wrap">
+            <CategoryTabs
+              categories={allCategories}
+              selected={selectedCategory}
+              onSelect={setSelectedCategory}
+            />
+          </div>
+        )}
+
+        <p className="dashboard-caption">
           {filtered.length} {filtered.length === 1 ? "bookmark" : "bookmarks"}
           {hasFilters ? " found" : ""}
         </p>
@@ -286,7 +285,11 @@ export default function DemoPage() {
         {filtered.length === 0 && <EmptyState hasSearch={hasFilters} />}
 
         {filtered.length > 0 && view === "grid" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <Masonry
+            breakpointCols={masonryBreakpoints}
+            className="masonry-grid"
+            columnClassName="masonry-grid-column"
+          >
             {filtered.map((bookmark) => (
               <BookmarkCard
                 key={bookmark.id}
@@ -295,11 +298,11 @@ export default function DemoPage() {
                 onUpdate={handleUpdate}
               />
             ))}
-          </div>
+          </Masonry>
         )}
 
         {filtered.length > 0 && view === "list" && (
-          <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+          <div className="dashboard-list-wrap">
             {filtered.map((bookmark) => (
               <BookmarkListItem
                 key={bookmark.id}
@@ -310,7 +313,9 @@ export default function DemoPage() {
             ))}
           </div>
         )}
-      </main>
+      </div>
+
+      <ToastProvider />
     </div>
   );
 }

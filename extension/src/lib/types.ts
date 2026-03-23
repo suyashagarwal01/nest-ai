@@ -39,6 +39,7 @@ export interface PageMeta {
   ogImage: string;
   metaKeywords: string[];
   articleTags: string[];
+  ogType: string | null;
   jsonLdType: string | null;
   headings: string[];
 }

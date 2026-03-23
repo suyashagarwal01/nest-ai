@@ -58,6 +58,20 @@ Nest v2/
 - Prefer server components in Next.js; use client components only when interactivity is needed.
 - All Supabase queries go through typed client — generate types with `supabase gen types typescript`.
 
+## Design System Rules (Web Dashboard)
+All UI in `web/` MUST follow these rules. No exceptions.
+
+- **Colors**: Use `var(--color-*)` tokens from `globals.css :root`. Never hardcode hex values in CSS or components.
+- **Typography**: Use `var(--text-*)` for sizes, `var(--font-*)` for weights. Never use raw `12px` or `600`.
+- **Spacing**: Use `var(--space-*)` tokens. Never hardcode pixel values for padding/margin/gap.
+- **Radii**: Use `var(--radius-*)` tokens.
+- **Shadows**: Use `var(--shadow-*)` tokens. Never write raw `box-shadow` values.
+- **No inline styles**: Never use `style={{}}` in components. Create CSS classes in `globals.css` instead.
+- **No Tailwind color classes**: Never use `neutral-*`, `red-*`, `green-*` etc. Use token-based CSS classes.
+- **Buttons**: Use the `<Button>` component from `@/components/ui/button` with variants (`primary`, `secondary`, `ghost`, `google`). Do not create one-off button styles.
+- **Components**: All dashboard components live in `web/src/components/`. Shared primitives (Button, Logo) live in `web/src/components/ui/`.
+- **New tokens**: If a design needs a new color/shadow/radius, add it to `:root` in `globals.css` first, then reference it.
+
 ## Current Phase
 Phase 1 — MVP. See `docs/PRD.md` section 10 for the full roadmap.
 

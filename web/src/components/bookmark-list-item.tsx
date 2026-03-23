@@ -1,209 +1,96 @@
 "use client";
 
-import { useState } from "react";
-import { formatDistanceToNow } from "date-fns";
-import { ExternalLink, Pencil, Trash2, Check, X, FolderPlus } from "lucide-react";
+import { Trash2, Copy, ExternalLink } from "lucide-react";
 import type { Bookmark, Tag } from "@/lib/types";
-import { createSupabaseBrowser } from "@/lib/supabase-browser";
-import { CollectionPickerDropdown } from "@/components/collection-picker-dropdown";
+import { showToast } from "@/components/toast";
 
 interface BookmarkListItemProps {
   bookmark: Bookmark & { bookmark_tags?: { tags: Tag }[] };
   onDelete: (id: string) => void;
   onUpdate: (bookmark: Bookmark) => void;
-  readOnly?: boolean;
+}
+
+function formatCompactTime(date: string): string {
+  const now = Date.now();
+  const then = new Date(date).getTime();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMs / 3600000);
+  const diffDay = Math.floor(diffMs / 86400000);
+
+  if (diffMin < 1) return "now";
+  if (diffMin < 60) return `${diffMin}m`;
+  if (diffHr < 24) return `${diffHr}h`;
+  if (diffDay <= 29) return `${diffDay}d`;
+
+  const d = new Date(date);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dd}/${mm}/${yy}`;
 }
 
 export function BookmarkListItem({
   bookmark,
   onDelete,
-  onUpdate,
-  readOnly,
 }: BookmarkListItemProps) {
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(bookmark.title ?? "");
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [showCollectionPicker, setShowCollectionPicker] = useState(false);
+  const time = formatCompactTime(bookmark.created_at);
 
-  const supabase = createSupabaseBrowser();
-  const tags =
-    bookmark.bookmark_tags?.map((bt) => bt.tags) ?? bookmark.tags ?? [];
-  const timeAgo = formatDistanceToNow(new Date(bookmark.created_at), {
-    addSuffix: true,
-  });
-
-  async function handleSave() {
-    const { data, error } = await supabase
-      .from("bookmarks")
-      .update({ title })
-      .eq("id", bookmark.id)
-      .select()
-      .single();
-
-    if (!error && data) {
-      onUpdate({ ...bookmark, ...data });
-    }
-    setEditing(false);
+  function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    onDelete(bookmark.id);
   }
 
-  async function handleDelete() {
-    const { error } = await supabase
-      .from("bookmarks")
-      .delete()
-      .eq("id", bookmark.id);
+  function handleCopy(e: React.MouseEvent) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(bookmark.url);
+    showToast("Link copied to clipboard");
+  }
 
-    if (!error) {
-      onDelete(bookmark.id);
-    }
+  function handleOpen(e: React.MouseEvent) {
+    e.stopPropagation();
+    window.open(bookmark.url, "_blank");
   }
 
   return (
-    <div className="group flex items-center gap-4 px-4 py-3 hover:bg-neutral-50 transition-colors border-b border-neutral-100 last:border-0">
-      {/* Favicon */}
-      <div className="w-8 h-8 rounded-md bg-neutral-100 flex items-center justify-center shrink-0 overflow-hidden">
-        {bookmark.favicon_url ? (
-          <img
-            src={bookmark.favicon_url}
-            alt=""
-            className="w-4 h-4"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        ) : (
-          <span className="text-xs font-bold text-neutral-300">
-            {(bookmark.domain ?? "?")[0].toUpperCase()}
-          </span>
-        )}
-      </div>
-
-      {/* Content */}
+    <div
+      className="bk-list-item"
+      onClick={() => window.open(bookmark.url, "_blank")}
+    >
       <div className="flex-1 min-w-0">
-        {editing ? (
-          <div className="flex items-center gap-2">
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="flex-1 px-2 py-1 border border-neutral-200 rounded-md text-sm outline-none focus:border-neutral-400"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSave();
-                if (e.key === "Escape") setEditing(false);
-              }}
-            />
-            <button
-              onClick={handleSave}
-              className="p-1 rounded hover:bg-neutral-100 text-neutral-600 cursor-pointer"
-            >
-              <Check size={14} />
-            </button>
-            <button
-              onClick={() => setEditing(false)}
-              className="p-1 rounded hover:bg-neutral-100 text-neutral-400 cursor-pointer"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        ) : (
-          <>
-            <a
-              href={bookmark.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-medium text-neutral-900 hover:text-neutral-600 truncate block"
-            >
-              {bookmark.title || bookmark.url}
-            </a>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xs text-neutral-400 truncate">
-                {bookmark.domain}
-              </span>
-              <span className="text-xs text-neutral-300">·</span>
-              <span className="text-xs text-neutral-400 shrink-0">
-                {timeAgo}
-              </span>
-              {(bookmark.category || bookmark.domain_context || tags.length > 0) && (
-                <>
-                  <span className="text-xs text-neutral-300">·</span>
-                  <div className="flex items-center gap-1 overflow-hidden">
-                    {bookmark.category && bookmark.category !== "Other" && (
-                      <span className="px-1.5 py-0 bg-neutral-900 text-white text-[10px] rounded-full shrink-0 font-medium">
-                        {bookmark.category}
-                      </span>
-                    )}
-                    {bookmark.domain_context && (
-                      <span className="px-1.5 py-0 bg-neutral-200 text-neutral-700 text-[10px] rounded-full shrink-0 font-medium">
-                        {bookmark.domain_context}
-                      </span>
-                    )}
-                    {tags.slice(0, 3).map((tag) => (
-                      <span
-                        key={tag.id}
-                        className="px-1.5 py-0 bg-neutral-100 text-neutral-400 text-[10px] rounded-full shrink-0"
-                      >
-                        {tag.name}
-                      </span>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </>
-        )}
+        <span className="bk-list-title">
+          {bookmark.title || bookmark.url}
+        </span>
+        <div className="bk-list-meta">
+          <span>{bookmark.domain}</span>
+          <span>&middot;</span>
+          <span>{time}</span>
+        </div>
       </div>
 
-      {/* Actions */}
-      {!editing && !readOnly && (
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <a
-            href={bookmark.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400"
-          >
-            <ExternalLink size={13} />
-          </a>
-          <div className="relative">
-            <button
-              onClick={() => setShowCollectionPicker((v) => !v)}
-              className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 cursor-pointer"
-              title="Add to collection"
-            >
-              <FolderPlus size={13} />
-            </button>
-            {showCollectionPicker && (
-              <CollectionPickerDropdown
-                bookmarkId={bookmark.id}
-                onClose={() => setShowCollectionPicker(false)}
-              />
-            )}
-          </div>
-          <button
-            onClick={() => setEditing(true)}
-            className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 cursor-pointer"
-          >
-            <Pencil size={13} />
-          </button>
-          {confirmDelete ? (
-            <button
-              onClick={handleDelete}
-              className="p-1.5 rounded-md hover:bg-red-50 text-red-500 cursor-pointer"
-            >
-              <Check size={13} />
-            </button>
-          ) : (
-            <button
-              onClick={() => {
-                setConfirmDelete(true);
-                setTimeout(() => setConfirmDelete(false), 3000);
-              }}
-              className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 cursor-pointer"
-            >
-              <Trash2 size={13} />
-            </button>
-          )}
-        </div>
-      )}
+      <div className="bk-list-actions">
+        <button
+          onClick={handleCopy}
+          className="bk-list-action-btn"
+          title="Copy link"
+        >
+          <Copy size={14} />
+        </button>
+        <button
+          onClick={handleOpen}
+          className="bk-list-action-btn"
+          title="Open in new tab"
+        >
+          <ExternalLink size={14} />
+        </button>
+        <button
+          onClick={handleDelete}
+          className="bk-list-action-btn bk-list-action-btn--danger"
+          title="Delete"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
     </div>
   );
 }

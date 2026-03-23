@@ -1,19 +1,28 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import Masonry from "react-masonry-css";
+import { Upload } from "lucide-react";
+import Link from "next/link";
 import { createSupabaseBrowser } from "@/lib/supabase-browser";
 import type { Bookmark, Tag } from "@/lib/types";
 import { Header } from "@/components/header";
 import { SearchBar } from "@/components/search-bar";
 import { CategoryTabs } from "@/components/category-tabs";
-import { TagFilter } from "@/components/tag-filter";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { BookmarkListItem } from "@/components/bookmark-list-item";
+import { ViewSwitcher } from "@/components/view-switcher";
+import { ToastProvider, showToast } from "@/components/toast";
 import { EmptyState } from "@/components/empty-state";
-import { SuggestionBanner } from "@/components/suggestion-banner";
-import { computeSuggestions, dismissSuggestion } from "@/lib/suggestions";
 
 type BookmarkRow = Bookmark & { bookmark_tags: { tags: Tag }[] };
+
+const masonryBreakpoints = {
+  default: 4,
+  1100: 3,
+  768: 2,
+  480: 1,
+};
 
 export default function DashboardPage() {
   const supabase = createSupabaseBrowser();
@@ -28,10 +37,7 @@ export default function DashboardPage() {
   const [searchResults, setSearchResults] = useState<BookmarkRow[] | null>(null);
   const [userId, setUserId] = useState<string>();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [view, setView] = useState<"grid" | "list" | "grouped">("grid");
-  const [collections, setCollections] = useState<{ id: string; name: string }[]>([]);
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<"grid" | "list">("grid");
 
   // Fetch bookmarks with tags
   const fetchBookmarks = useCallback(async () => {
@@ -52,12 +58,6 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser();
       setUserEmail(user?.email ?? undefined);
       setUserId(user?.id);
-
-      // Fetch lightweight collection list for suggestions
-      const { data: colls } = await supabase
-        .from("collections")
-        .select("id, name");
-      if (colls) setCollections(colls);
     };
     init();
   }, [fetchBookmarks, supabase.auth]);
@@ -66,7 +66,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const query = search.trim();
     if (!query || !userId) {
-      // Clear results after debounce to avoid synchronous setState in effect body
       const timer = setTimeout(() => {
         setSearchResults(null);
         setSearching(false);
@@ -130,147 +129,66 @@ export default function DashboardPage() {
     return Array.from(cats).sort();
   }, [bookmarks]);
 
-  const allTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    bookmarks.forEach((b) => {
-      b.bookmark_tags?.forEach((bt) => {
-        if (bt.tags?.name) tagSet.add(bt.tags.name);
-      });
-    });
-    return Array.from(tagSet).sort();
-  }, [bookmarks]);
-
-  // Filtered bookmarks — use server search results when searching, else full list
+  // Filtered bookmarks
   const filtered = useMemo(() => {
     let result = searchResults !== null ? searchResults : bookmarks;
 
-    // Category filter
     if (selectedCategory) {
       result = result.filter((b) => b.category === selectedCategory);
     }
 
-    // Tag filter
-    if (selectedTags.length > 0) {
-      result = result.filter((b) => {
-        const bookmarkTags =
-          b.bookmark_tags?.map((bt) => bt.tags?.name).filter(Boolean) ?? [];
-        return selectedTags.some((t) => bookmarkTags.includes(t));
-      });
-    }
-
     return result;
-  }, [bookmarks, searchResults, selectedCategory, selectedTags]);
+  }, [bookmarks, searchResults, selectedCategory]);
 
-  // Group filtered bookmarks by category
-  const groupedByCategory = useMemo(() => {
-    const groups = new Map<string, BookmarkRow[]>();
-    filtered.forEach((b) => {
-      const cat = b.category || "Other";
-      const list = groups.get(cat) || [];
-      list.push(b);
-      groups.set(cat, list);
-    });
-    // Sort alphabetically, "Other" last
-    return new Map(
-      [...groups.entries()].sort(([a], [b]) => {
-        if (a === "Other") return 1;
-        if (b === "Other") return -1;
-        return a.localeCompare(b);
-      })
-    );
-  }, [filtered]);
-
-  // Compute suggestions (pure derivation from state)
-  const suggestions = useMemo(() => {
-    if (bookmarks.length === 0) return [];
-    return computeSuggestions(bookmarks, collections).filter(
-      (s) => !dismissedIds.has(s.id)
-    );
-  }, [bookmarks, collections, dismissedIds]);
-
-  function handleDismissSuggestion(id: string) {
-    dismissSuggestion(id);
-    setDismissedIds((prev) => new Set([...prev, id]));
-  }
-
-  async function handleCreateCollectionFromSuggestion(tag: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: collection, error } = await supabase
-      .from("collections")
-      .insert({ user_id: user.id, name: tag, description: `Bookmarks tagged "${tag}"` })
-      .select()
-      .single();
-
-    if (error || !collection) return;
-
-    // Add matching bookmarks to the collection
-    const matching = bookmarks.filter((b) =>
-      b.bookmark_tags?.some((bt) => bt.tags?.name === tag)
-    );
-    for (const b of matching) {
-      await supabase.from("collection_bookmarks").insert({
-        collection_id: collection.id,
-        bookmark_id: b.id,
-      });
-    }
-
-    // Update collections list (suggestions will recompute automatically)
-    setCollections((prev) => [...prev, { id: collection.id, name: tag }]);
-  }
-
-  function handleExport(format: "json" | "csv") {
-    const data = bookmarks.map((b) => ({
-      url: b.url,
-      title: b.title ?? "",
-      category: b.category ?? "",
-      domain: b.domain ?? "",
-      domain_context: b.domain_context ?? "",
-      tags: b.bookmark_tags?.map((bt) => bt.tags?.name).filter(Boolean).join(", ") ?? "",
-      note: b.note ?? "",
-      created_at: b.created_at,
-    }));
-
-    let blob: Blob;
-    let filename: string;
-
-    if (format === "json") {
-      blob = new Blob(
-        [JSON.stringify({ bookmarks: data }, null, 2)],
-        { type: "application/json" }
-      );
-      filename = "nest-bookmarks.json";
-    } else {
-      const columns = ["URL", "Title", "Category", "Domain", "Domain Context", "Tags", "Note", "Created At"];
-      const escape = (v: string) => {
-        if (v.includes(",") || v.includes('"') || v.includes("\n")) {
-          return `"${v.replace(/"/g, '""')}"`;
-        }
-        return v;
-      };
-      const rows = data.map((d) =>
-        [d.url, d.title, d.category, d.domain, d.domain_context, d.tags, d.note, d.created_at]
-          .map(escape)
-          .join(",")
-      );
-      blob = new Blob(
-        [columns.join(",") + "\n" + rows.join("\n")],
-        { type: "text/csv" }
-      );
-      filename = "nest-bookmarks.csv";
-    }
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingDeleteRef = useRef<{ bookmark: BookmarkRow; index: number } | null>(null);
 
   function handleDelete(id: string) {
+    // Cancel any previous pending delete
+    if (deleteTimerRef.current) {
+      clearTimeout(deleteTimerRef.current);
+      // Execute the previous pending delete immediately
+      if (pendingDeleteRef.current) {
+        const prevId = pendingDeleteRef.current.bookmark.id;
+        supabase.from("bookmarks").delete().eq("id", prevId);
+      }
+    }
+
+    // Store bookmark for potential undo
+    const idx = bookmarks.findIndex((b) => b.id === id);
+    const deleted = bookmarks[idx];
+    if (!deleted) return;
+    pendingDeleteRef.current = { bookmark: deleted, index: idx };
+
+    // Optimistic UI removal
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
+
+    // Show toast with undo
+    showToast("Link deleted successfully!", {
+      duration: 5000,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+          const pending = pendingDeleteRef.current;
+          if (pending) {
+            setBookmarks((prev) => {
+              const copy = [...prev];
+              copy.splice(pending.index, 0, pending.bookmark);
+              return copy;
+            });
+            pendingDeleteRef.current = null;
+          }
+        },
+      },
+    });
+
+    // Actually delete from DB after 5s
+    deleteTimerRef.current = setTimeout(() => {
+      supabase.from("bookmarks").delete().eq("id", id);
+      pendingDeleteRef.current = null;
+      deleteTimerRef.current = null;
+    }, 5000);
   }
 
   function handleUpdate(updated: Bookmark) {
@@ -279,54 +197,44 @@ export default function DashboardPage() {
     );
   }
 
-  function toggleTag(tag: string) {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  }
-
-  const hasFilters = !!search || !!selectedCategory || selectedTags.length > 0;
+  const hasFilters = !!search || !!selectedCategory;
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <Header view={view} onViewChange={setView} onExport={handleExport} userEmail={userEmail} />
+    <div className="dashboard-page">
+      <Header userEmail={userEmail} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Search + filters */}
-        <div className="flex flex-col gap-4 mb-6">
-          <SearchBar value={search} onChange={setSearch} loading={searching} />
-          <CategoryTabs
-            categories={allCategories}
-            selected={selectedCategory}
-            onSelect={setSelectedCategory}
-          />
-          <TagFilter
-            tags={allTags}
-            selected={selectedTags}
-            onToggle={toggleTag}
-            onClear={() => setSelectedTags([])}
-          />
+      <div className="dashboard-content">
+        {/* Search + actions */}
+        <div className="dashboard-filters">
+          <div className="dashboard-filter-search">
+            <SearchBar value={search} onChange={setSearch} loading={searching} />
+          </div>
+          <div className="dashboard-actions">
+            <Link href="/import" className="import-btn">
+              <Upload size={16} />
+              Import
+            </Link>
+            <div className="dashboard-separator" />
+            <ViewSwitcher view={view} onChange={setView} />
+          </div>
         </div>
 
-        {/* Smart suggestions */}
-        {!loading && suggestions.length > 0 && (
-          <div className="space-y-2 mb-4">
-            {suggestions.map((s) => (
-              <SuggestionBanner
-                key={s.id}
-                suggestion={s}
-                onDismiss={handleDismissSuggestion}
-                onCreate={handleCreateCollectionFromSuggestion}
-              />
-            ))}
+        {/* Category chips */}
+        {allCategories.length > 0 && (
+          <div className="dashboard-category-wrap">
+            <CategoryTabs
+              categories={allCategories}
+              selected={selectedCategory}
+              onSelect={setSelectedCategory}
+            />
           </div>
         )}
 
         {/* Results count */}
         {!loading && bookmarks.length > 0 && (
-          <p className="text-xs text-neutral-400 mb-4">
+          <p className="dashboard-caption">
             {filtered.length}{" "}
-            {filtered.length === 1 ? "bookmark" : "bookmarks"}
+            {filtered.length === 1 ? "saved link" : "saved links"}
             {hasFilters ? " found" : ""}
           </p>
         )}
@@ -343,9 +251,13 @@ export default function DashboardPage() {
           <EmptyState hasSearch={hasFilters} />
         )}
 
-        {/* Grid view */}
+        {/* Grid view — masonry */}
         {!loading && filtered.length > 0 && view === "grid" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <Masonry
+            breakpointCols={masonryBreakpoints}
+            className="masonry-grid"
+            columnClassName="masonry-grid-column"
+          >
             {filtered.map((bookmark) => (
               <BookmarkCard
                 key={bookmark.id}
@@ -354,12 +266,12 @@ export default function DashboardPage() {
                 onUpdate={handleUpdate}
               />
             ))}
-          </div>
+          </Masonry>
         )}
 
         {/* List view */}
         {!loading && filtered.length > 0 && view === "list" && (
-          <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+          <div className="dashboard-list-wrap">
             {filtered.map((bookmark) => (
               <BookmarkListItem
                 key={bookmark.id}
@@ -370,33 +282,9 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
+      </div>
 
-        {/* Grouped view */}
-        {!loading && filtered.length > 0 && view === "grouped" && (
-          <div className="space-y-8">
-            {[...groupedByCategory.entries()].map(([category, items]) => (
-              <section key={category}>
-                <h2 className="text-sm font-semibold text-neutral-700 mb-3">
-                  {category}{" "}
-                  <span className="text-neutral-400 font-normal">
-                    ({items.length})
-                  </span>
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {items.map((bookmark) => (
-                    <BookmarkCard
-                      key={bookmark.id}
-                      bookmark={bookmark}
-                      onDelete={handleDelete}
-                      onUpdate={handleUpdate}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        )}
-      </main>
+      <ToastProvider />
     </div>
   );
 }

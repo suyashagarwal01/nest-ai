@@ -143,6 +143,7 @@ const DOMAIN_MAP: Record<string, DomainInfo> = {
   "ghost.org": { category: "Articles", type: "blog", label: "Ghost" },
   "mirror.xyz": { category: "Articles", type: "blog", label: "Mirror" },
   "beehiiv.com": { category: "Articles", type: "newsletter", label: "beehiiv" },
+  "every.to": { category: "Articles", type: "newsletter", label: "Every", defaultTopics: ["ai", "technology"] },
 
   // Social
   "twitter.com": { category: "Social", type: "microblog", label: "Twitter" },
@@ -337,6 +338,11 @@ const STOP_WORDS = new Set([
   "real", "part", "based", "long", "high", "full", "small", "large",
   "right", "left", "old", "deep", "deepen", "understanding",
   "place", "true", "level", "different", "important", "possible",
+  // Homepage / marketing copy filler
+  "stay", "edge", "recent", "subscription", "subscribe", "stop",
+  "rules", "thrive", "planning", "strategy", "executing", "unlock",
+  "access", "inside", "ready", "save", "keep", "pick", "apply",
+  "master", "guide", "ultimate", "complete", "essential", "curated",
   // People-related generic words
   "people", "users", "team", "community", "members", "creators",
   "designers", "developers", "creatives", "professionals", "experts",

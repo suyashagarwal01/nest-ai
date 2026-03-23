@@ -98,11 +98,13 @@ async function uploadScreenshot(
   const blob = dataUrlToBlob(dataUrl);
   const path = `${userId}/${bookmarkId}.jpg`;
 
+  // Remove existing file first to avoid RLS conflicts on update
+  await supabase.storage.from("screenshots").remove([path]);
+
   const { error } = await supabase.storage
     .from("screenshots")
     .upload(path, blob, {
       contentType: "image/jpeg",
-      upsert: true,
     });
 
   if (error) {
@@ -220,7 +222,7 @@ async function saveBookmark(payload: SavePayload): Promise<void> {
     throw new Error(bookmarkError?.message ?? "Failed to save bookmark");
   }
 
-  // Upload screenshot (async, don't block)
+  // Upload screenshot (delete old file first to avoid RLS conflicts on update)
   if (screenshotDataUrl) {
     const urls = await uploadScreenshot(
       user.id,
@@ -237,6 +239,12 @@ async function saveBookmark(payload: SavePayload): Promise<void> {
         .eq("id", bookmark.id);
     }
   }
+
+  // Clear old bookmark_tags for this bookmark before re-linking
+  await supabase
+    .from("bookmark_tags")
+    .delete()
+    .eq("bookmark_id", bookmark.id);
 
   // Create/link AI tags (topics from 3-layer taxonomy)
   for (const tagName of tagResult.topics) {

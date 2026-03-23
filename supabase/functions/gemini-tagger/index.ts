@@ -1,17 +1,16 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+const GROQ_MODEL = "llama-3.1-8b-instant";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-// In-memory rate limiter: 14 RPM cap (under 15 RPM free limit)
-const RPM_LIMIT = 14;
+// In-memory rate limiter: 28 RPM cap (under 30 RPM free limit)
+const RPM_LIMIT = 28;
 const requestTimestamps: number[] = [];
 
 function isRateLimited(): boolean {
   const now = Date.now();
   const oneMinuteAgo = now - 60_000;
-  // Remove old timestamps
   while (requestTimestamps.length > 0 && requestTimestamps[0] < oneMinuteAgo) {
     requestTimestamps.shift();
   }
@@ -36,7 +35,6 @@ const VALID_CATEGORIES = new Set([
 ]);
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
@@ -48,9 +46,9 @@ serve(async (req) => {
     });
   }
 
-  if (!GEMINI_API_KEY) {
+  if (!GROQ_API_KEY) {
     return new Response(
-      JSON.stringify({ error: "GEMINI_API_KEY not configured" }),
+      JSON.stringify({ error: "GROQ_API_KEY not configured" }),
       {
         status: 500,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
@@ -82,7 +80,7 @@ serve(async (req) => {
       );
     }
 
-    const prompt = `You are a bookmark categorization assistant. Categorize this webpage.
+    const userPrompt = `Categorize this webpage.
 
 URL: ${url || "N/A"}
 Title: ${title || "N/A"}
@@ -99,39 +97,69 @@ Respond with ONLY a JSON object (no markdown, no explanation):
 
     recordRequest();
 
-    const geminiResponse = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 256,
+    const groqBody = JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [
+        {
+          role: "system",
+          content: "You are a bookmark categorization assistant. Respond with only valid JSON, no markdown fences or explanation.",
         },
-      }),
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.1,
+      max_tokens: 256,
+      response_format: { type: "json_object" },
     });
 
-    if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text();
-      console.error("Gemini API error:", errText);
+    // Retry once on transient server errors (NOT 429)
+    let groqResponse: Response | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      groqResponse = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+        },
+        body: groqBody,
+      });
+      if (groqResponse.ok) break;
+      const status = groqResponse.status;
+      if (attempt === 0 && (status === 500 || status === 502 || status === 503)) {
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+      break;
+    }
+
+    if (!groqResponse || !groqResponse.ok) {
+      const errText = groqResponse ? await groqResponse.text() : "no response";
+      const groqStatus = groqResponse?.status ?? 0;
+      console.error(`Groq API error (${groqStatus}):`, errText);
+      const responseStatus = groqStatus === 429 ? 429 : 502;
       return new Response(
-        JSON.stringify({ error: "Gemini API error" }),
+        JSON.stringify({ error: `Groq API error (${groqStatus})`, detail: errText.slice(0, 200) }),
         {
-          status: 502,
+          status: responseStatus,
           headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
         }
       );
     }
 
-    const geminiData = await geminiResponse.json();
-    const rawText =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const groqData = await groqResponse.json();
+    const rawText = groqData?.choices?.[0]?.message?.content ?? "";
 
-    // Parse JSON from response (tolerate markdown fences)
+    // Parse JSON from response (tolerate markdown fences just in case)
     const jsonStr = rawText
       .replace(/```json?\s*/g, "")
       .replace(/```/g, "")
       .trim();
+    if (!jsonStr) {
+      console.error("Empty response from Groq. Full response:", JSON.stringify(groqData).slice(0, 500));
+      return new Response(
+        JSON.stringify({ error: "Empty Groq response" }),
+        { status: 502, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
+      );
+    }
     const parsed = JSON.parse(jsonStr);
 
     // Validate and sanitize
@@ -158,9 +186,10 @@ Respond with ONLY a JSON object (no markdown, no explanation):
       }
     );
   } catch (err) {
-    console.error("gemini-tagger error:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("groq-tagger error:", msg);
     return new Response(
-      JSON.stringify({ error: "Internal error" }),
+      JSON.stringify({ error: "Internal error", detail: msg }),
       {
         status: 500,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },

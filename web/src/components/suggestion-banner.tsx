@@ -15,23 +15,23 @@ export function SuggestionBanner({
   onCreate,
 }: SuggestionBannerProps) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-white border border-neutral-200 rounded-lg">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-neutral-700">
+    <div className="suggestion-banner">
+      <div className="suggestion-banner-text">
+        <p>
           {suggestion.message}.{" "}
-          <span className="text-neutral-400">Create a collection?</span>
+          <span className="suggestion-banner-hint">Create a collection?</span>
         </p>
       </div>
       <button
         onClick={() => onCreate(suggestion.tag)}
-        className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-neutral-900 text-white rounded-md hover:bg-neutral-800 shrink-0 cursor-pointer"
+        className="suggestion-banner-create"
       >
         <FolderPlus size={12} />
         Create &ldquo;{suggestion.tag}&rdquo;
       </button>
       <button
         onClick={() => onDismiss(suggestion.id)}
-        className="p-1 rounded-md hover:bg-neutral-100 text-neutral-400 shrink-0 cursor-pointer"
+        className="suggestion-banner-dismiss"
         title="Dismiss"
       >
         <X size={14} />

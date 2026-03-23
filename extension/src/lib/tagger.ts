@@ -13,6 +13,7 @@ import type { PageMeta, TagResult, ConsensusTag, DisplayTag } from "./types";
 
 /** JSON-LD @type → category overrides */
 const JSON_LD_CATEGORY_MAP: Record<string, string> = {
+  Article: "Articles",
   BlogPosting: "Articles",
   NewsArticle: "News",
   ScholarlyArticle: "Research",
@@ -24,6 +25,21 @@ const JSON_LD_CATEGORY_MAP: Record<string, string> = {
   SoftwareApplication: "Development",
   VideoObject: "Video",
   MusicRecording: "Audio",
+};
+
+/** og:type → category overrides (scalable — most sites set og:type) */
+const OG_TYPE_CATEGORY_MAP: Record<string, string> = {
+  article: "Articles",
+  blog: "Articles",
+  book: "Reference",
+  "video.movie": "Video",
+  "video.episode": "Video",
+  "video.other": "Video",
+  "music.song": "Audio",
+  "music.album": "Audio",
+  product: "Shopping",
+  "product.group": "Shopping",
+  profile: "Social",
 };
 
 /**
@@ -61,7 +77,15 @@ export function generateTags(meta: PageMeta): TagResult {
   // 5. Path override (e.g. github.com/blog/ → "Articles")
   category = inferCategoryFromPath(meta.url, category);
 
-  // 6. JSON-LD override
+  // 6. og:type override (scalable — works on most sites without domain map entry)
+  if (meta.ogType) {
+    const ogCategory = OG_TYPE_CATEGORY_MAP[meta.ogType.toLowerCase()];
+    if (ogCategory) {
+      category = ogCategory;
+    }
+  }
+
+  // 7. JSON-LD override (most specific signal — wins over og:type)
   if (meta.jsonLdType) {
     const ldCategory = JSON_LD_CATEGORY_MAP[meta.jsonLdType];
     if (ldCategory) {
@@ -69,10 +93,10 @@ export function generateTags(meta: PageMeta): TagResult {
     }
   }
 
-  // 7. Domain context
+  // 8. Domain context
   const domainContext = label ? buildDomainContext(label, category) : "";
 
-  // 8. Topic extraction (priority order, deduplicated)
+  // 9. Topic extraction (priority order, deduplicated)
   // Pre-seed seen set with domain label words so they don't appear as topics
   const seen = new Set<string>();
   if (label) {
@@ -119,12 +143,19 @@ export function generateTags(meta: PageMeta): TagResult {
   // Title keywords
   addTopics(extractKeywords(meta.title));
 
-  // Heading keywords (use higher minLength — headings have more filler)
-  if (meta.headings?.length) {
+  // Heading keywords — skip on homepages where headings are marketing copy
+  const isHomepage = (() => {
+    try {
+      const pathname = new URL(meta.url).pathname;
+      return pathname === "/" || pathname === "";
+    } catch { return false; }
+  })();
+
+  if (!isHomepage && meta.headings?.length) {
     addTopics(extractKeywords(meta.headings.join(" "), 5, 4));
   }
 
-  // 9. Confidence (path match > intelligence-based > hardcoded > fallback)
+  // 10. Confidence (path match > intelligence-based > hardcoded > fallback)
   let confidence: number;
   if (pathMatch) {
     confidence = pathMatch.confidence;

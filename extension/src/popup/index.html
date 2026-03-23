@@ -10,9 +10,24 @@
     <!-- Auth screen -->
     <div id="auth-view" class="view" style="display: none">
       <div class="auth-container">
-        <div class="logo">Nest</div>
+        <div class="auth-logo">
+          <!-- Nest mark (two overlapping ellipses) -->
+          <svg width="32" height="23" viewBox="0 0 47.9287 34.3553" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M45.0216 20.4665C45.0216 23.4088 42.8477 26.287 38.8605 28.487C34.9085 30.6674 29.3801 32.0466 23.2199 32.0466C17.0597 32.0465 11.5321 30.6674 7.5802 28.487C3.59286 26.287 1.41907 23.4088 1.41907 20.4665C1.41917 17.5243 3.59307 14.6468 7.5802 12.4469C11.5321 10.2665 17.0597 8.88646 23.2199 8.8864C29.3801 8.8864 34.9085 10.2665 38.8605 12.447C42.8475 14.6468 45.0215 17.5243 45.0216 20.4665Z" stroke="url(#nest-auth-grad-1)" stroke-width="2"/>
+            <path d="M4.07109 11.8471C3.35032 14.5371 4.61722 17.7046 7.7142 20.7011C10.7833 23.6706 15.4904 26.2918 21.1178 27.7998C26.7454 29.3077 32.1332 29.3913 36.276 28.3542C40.4561 27.3076 43.1372 25.1979 43.858 22.508C44.5787 19.8181 43.3117 16.6504 40.2149 13.654C37.1457 10.6845 32.4379 8.06295 26.8103 6.55505C21.1829 5.04724 15.7958 4.96382 11.6531 6.00089C7.47283 7.04738 4.79194 9.1572 4.07109 11.8471Z" stroke="url(#nest-auth-grad-2)" stroke-width="2"/>
+            <defs>
+              <linearGradient id="nest-auth-grad-1" x1="46.0216" y1="20.4667" x2="0.418823" y2="20.4667" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#CDB4EA"/><stop offset="1" stop-color="#9B8ED1"/>
+              </linearGradient>
+              <linearGradient id="nest-auth-grad-2" x1="3.10512" y1="11.5885" x2="44.8236" y2="22.7669" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#CDB4EA"/><stop offset="1" stop-color="#9B8ED1"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="logo-text">Nest</span>
+        </div>
         <p class="subtitle">Smart bookmarks, everywhere.</p>
-        <button id="btn-google-signin" class="btn btn-google btn-full">
+        <button id="btn-google-signin" class="btn-google">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
             <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -26,96 +41,118 @@
     </div>
 
     <!-- Save screen -->
-    <div id="save-view" class="view" style="display: none">
-      <div class="account-bar">
-        <div class="account-info">
-          <img id="user-avatar" class="avatar" src="" alt="" />
-          <span id="user-name" class="account-name"></span>
+    <div id="save-view" class="view">
+      <!-- Header -->
+      <div class="ext-header">
+        <div class="ext-header-left">
+          <div id="user-avatar" class="ext-avatar">
+            <img id="user-avatar-img" class="ext-avatar-img" src="" alt="" style="display: none" />
+            <span id="user-avatar-initial" class="ext-avatar-initial"></span>
+          </div>
+          <span id="user-name" class="ext-user-name"></span>
         </div>
-        <button id="btn-signout" class="btn-link">Sign out</button>
+        <button id="btn-dashboard-header" class="ext-dashboard-link">
+          <span class="ext-dashboard-label">Nest</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+        </button>
       </div>
 
-      <div id="duplicate-banner" class="duplicate-banner" style="display: none">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <span>Already saved <span id="duplicate-date"></span> — update?</span>
+      <!-- Content -->
+      <div class="ext-content">
+        <!-- Skeleton loader (shown while async ops complete) -->
+        <div id="skeleton-loader" class="ext-skeleton">
+          <div class="ext-skel-bar ext-skel-bar--url"></div>
+          <div class="ext-skel-block"></div>
+          <div class="ext-skel-bar ext-skel-bar--title"></div>
+          <div class="ext-skel-tags">
+            <div class="ext-skel-pill ext-skel-pill--dark"></div>
+            <div class="ext-skel-pill"></div>
+            <div class="ext-skel-pill ext-skel-pill--wide"></div>
+          </div>
+          <div class="ext-skel-bar ext-skel-bar--input"></div>
+        </div>
+
+        <!-- Real content (hidden until loaded) -->
+        <div id="content-loaded" class="ext-loaded" style="display: none">
+          <!-- Duplicate banner (hidden by default, shown for updates) -->
+          <div id="duplicate-banner" class="ext-duplicate-banner" style="display: none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Already in Nest, want to update?</span>
+          </div>
+
+          <!-- URL -->
+          <div class="ext-url-row">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+          <span id="display-url" class="ext-url-text"></span>
+        </div>
+
+        <!-- Screenshot preview (always shown) -->
+        <div id="screenshot-preview" class="ext-screenshot">
+          <img id="screenshot-img" src="" alt="" />
+        </div>
+
+        <!-- Title input -->
+        <div class="ext-input-wrap">
+          <input id="input-title" type="text" placeholder="Page title" class="ext-input" />
+          <button id="title-clear" class="ext-input-clear hidden" aria-label="Clear title">&times;</button>
+        </div>
+
+        <!-- Tags -->
+        <div id="tags-preview" class="ext-tags"></div>
+
+        <!-- Custom tags input -->
+        <input
+          id="input-user-tags"
+          type="text"
+          placeholder="Add tag(s), separated by commas"
+          class="ext-input ext-input--no-clear"
+        />
+
+        </div>
       </div>
 
-      <div id="screenshot-preview" class="screenshot-preview">
-        <img id="screenshot-img" src="" alt="" />
-      </div>
-
-      <input
-        id="input-title"
-        type="text"
-        placeholder="Page title"
-        class="input"
-      />
-
-      <div class="url-row">
-        <img id="favicon" class="favicon" src="" alt="" />
-        <span id="display-url" class="url-text"></span>
-      </div>
-
-      <div id="tags-preview" class="tags-preview"></div>
-
-      <input
-        id="input-user-tags"
-        type="text"
-        placeholder="Add tag(s), separated by commas"
-        class="input"
-      />
-
-      <div class="toggle-row">
-        <span class="toggle-label">Capture screenshot</span>
-        <label class="toggle">
-          <input id="toggle-screenshot" type="checkbox" checked />
-          <span class="toggle-track">
-            <span class="toggle-knob"></span>
-          </span>
-        </label>
-      </div>
-
-      <button id="btn-save" class="btn btn-primary btn-full">Save</button>
-      <div id="save-status" class="status"></div>
-
-      <div class="footer">
-        <button id="btn-dashboard-footer" class="btn-link">View Dashboard</button>
+      <!-- Save / Update button (sticky, hidden until loaded) -->
+      <div id="btn-sticky-wrap" class="ext-btn-sticky" style="display: none">
+        <button id="btn-save" class="ext-btn-save">Save to Nest</button>
       </div>
     </div>
 
-    <!-- Success screen -->
+    <!-- Status screen (saving / error / success) -->
     <div id="success-view" class="view" style="display: none">
-      <div class="success-timer-bar">
-        <div id="timer-progress" class="success-timer-progress"></div>
+      <!-- Saving state: 72px, no top bar -->
+      <div id="status-saving" class="ext-status ext-status--saving">
+        <div class="ext-status-row">
+          <div class="ext-spinner"></div>
+          <span class="ext-status-text">One moment, saving...</span>
+        </div>
       </div>
 
-      <!-- Loading state (shown while saving) -->
-      <div id="success-loading" class="success-loading">
-        <div class="success-spinner"></div>
-        <span class="success-loading-text">Saving...</span>
+      <!-- Error state: 72px, red top bar -->
+      <div id="status-error" class="ext-status ext-status--error" style="display: none">
+        <div class="ext-top-bar ext-top-bar--error"></div>
+        <div class="ext-status-row">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#d66056"><path d="M12 2L1 21h22L12 2zm0 4l7.53 13H4.47L12 6zm-1 4v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
+          <span id="error-text" class="ext-status-text">Oops! Failed to save. Please try again.</span>
+        </div>
       </div>
 
-      <!-- Saved state (shown after save completes) -->
-      <div id="success-saved" class="success-saved" style="display: none">
-        <div class="success-preview">
-          <div id="success-screenshot" class="success-screenshot">
+      <!-- Success state: 96px, purple timer top bar -->
+      <div id="status-success" class="ext-status ext-status--success" style="display: none">
+        <div id="timer-progress" class="ext-top-bar ext-top-bar--brand"></div>
+        <div class="ext-success-row">
+          <div id="success-screenshot" class="ext-success-thumb">
             <img id="success-screenshot-img" src="" alt="" />
           </div>
-          <div class="success-meta">
-            <div class="success-header">
-              <div class="success-check">✓</div>
-              <span class="success-label">Saved</span>
+          <div class="ext-success-info">
+            <div class="ext-success-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#34a853"/><path d="M8 12.5l2.5 2.5 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Saved successfully!</span>
             </div>
-            <p id="success-title" class="success-title"></p>
-            <div class="success-url-row">
-              <img id="success-favicon" class="favicon" src="" alt="" />
-              <span id="success-domain" class="url-text"></span>
-            </div>
-            <div id="success-tags" class="success-tags"></div>
+            <button id="btn-open-dashboard" class="ext-success-dashboard">
+              <span>View in dashboard</span>
+              <svg width="11" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+            </button>
           </div>
-        </div>
-        <div class="footer">
-          <button id="btn-open-dashboard" class="btn-link">View in Dashboard</button>
         </div>
       </div>
     </div>

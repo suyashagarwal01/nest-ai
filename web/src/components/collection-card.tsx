@@ -14,30 +14,28 @@ export function CollectionCard({ collection, onDelete }: CollectionCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
-    <div className="group bg-white border border-neutral-200 rounded-xl overflow-hidden hover:border-neutral-300 hover:shadow-sm transition-all">
-      {/* Cover / placeholder */}
-      <Link href={`/collections/${collection.id}`} className="block">
-        <div className="aspect-[16/8] bg-neutral-100 flex items-center justify-center">
-          <span className="text-3xl font-bold text-neutral-300">
+    <div className="collection-card">
+      <Link href={`/collections/${collection.id}`}>
+        <div className="collection-card-cover">
+          <span className="collection-card-cover-letter">
             {collection.name[0]?.toUpperCase() ?? "C"}
           </span>
         </div>
       </Link>
 
-      {/* Content */}
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2">
+      <div className="collection-card-body">
+        <div className="collection-card-header">
           <Link
             href={`/collections/${collection.id}`}
-            className="text-sm font-medium text-neutral-900 hover:text-neutral-600 line-clamp-1 flex-1"
+            className="collection-card-name"
           >
             {collection.name}
           </Link>
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <div className="collection-card-actions">
             {confirmDelete ? (
               <button
                 onClick={() => onDelete(collection.id)}
-                className="p-1.5 rounded-md hover:bg-red-50 text-red-500 cursor-pointer"
+                className="collection-card-action-btn collection-card-action-btn--danger"
                 title="Confirm delete"
               >
                 <Check size={13} />
@@ -48,7 +46,7 @@ export function CollectionCard({ collection, onDelete }: CollectionCardProps) {
                   setConfirmDelete(true);
                   setTimeout(() => setConfirmDelete(false), 3000);
                 }}
-                className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 cursor-pointer"
+                className="collection-card-action-btn"
                 title="Delete"
               >
                 <Trash2 size={13} />
@@ -58,22 +56,20 @@ export function CollectionCard({ collection, onDelete }: CollectionCardProps) {
         </div>
 
         {collection.description && (
-          <p className="text-xs text-neutral-500 mt-1 line-clamp-2">
-            {collection.description}
-          </p>
+          <p className="collection-card-desc">{collection.description}</p>
         )}
 
-        <div className="flex items-center gap-2 mt-3">
-          <span className="text-xs text-neutral-400">
+        <div className="collection-card-footer">
+          <span className="collection-card-count">
             {collection.bookmark_count}{" "}
             {collection.bookmark_count === 1 ? "bookmark" : "bookmarks"}
           </span>
           {collection.is_public ? (
-            <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-green-50 text-green-700 text-[10px] rounded-full">
+            <span className="collection-card-badge collection-card-badge--public">
               <Globe size={10} /> Public
             </span>
           ) : (
-            <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-neutral-100 text-neutral-500 text-[10px] rounded-full">
+            <span className="collection-card-badge collection-card-badge--private">
               <Lock size={10} /> Private
             </span>
           )}

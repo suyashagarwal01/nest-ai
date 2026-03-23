@@ -48,18 +48,28 @@ function getPageMeta(): PageMeta {
   // JSON-LD @type
   let jsonLdType: string | null = null;
   try {
+    // Content-specific types that should take priority over generic ones (e.g. WebSite)
+    const CONTENT_TYPES = new Set([
+      "Article", "BlogPosting", "NewsArticle", "ScholarlyArticle",
+      "TechArticle", "HowTo", "Course", "Recipe", "Product",
+      "SoftwareApplication", "VideoObject",
+    ]);
     const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    let fallbackType: string | null = null;
     for (const script of scripts) {
       const text = script.textContent;
       if (!text) continue;
       const data = JSON.parse(text);
-      // Handle both single object and array
-      const obj = Array.isArray(data) ? data[0] : data;
-      if (obj?.["@type"]) {
-        jsonLdType = Array.isArray(obj["@type"]) ? obj["@type"][0] : obj["@type"];
-        break;
+      const items = Array.isArray(data) ? data : [data];
+      for (const obj of items) {
+        const t = Array.isArray(obj?.["@type"]) ? obj["@type"][0] : obj?.["@type"];
+        if (!t) continue;
+        if (CONTENT_TYPES.has(t)) { jsonLdType = t; break; }
+        if (!fallbackType) fallbackType = t;
       }
+      if (jsonLdType) break;
     }
+    if (!jsonLdType) jsonLdType = fallbackType;
   } catch {
     // ignore malformed JSON-LD
   }
@@ -85,6 +95,7 @@ function getPageMeta(): PageMeta {
       getMeta("twitter:description"),
     favicon,
     ogImage: getMeta("og:image") || getMeta("twitter:image"),
+    ogType: getMeta("og:type") || null,
     metaKeywords,
     articleTags,
     jsonLdType,
