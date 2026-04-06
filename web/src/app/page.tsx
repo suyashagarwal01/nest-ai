@@ -11,6 +11,7 @@ import { SearchBar } from "@/components/search-bar";
 import { CategoryTabs } from "@/components/category-tabs";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { BookmarkListItem } from "@/components/bookmark-list-item";
+import { BookmarkDetailSheet } from "@/components/bookmark-detail-sheet";
 import { ViewSwitcher } from "@/components/view-switcher";
 import { ToastProvider, showToast } from "@/components/toast";
 import { EmptyState } from "@/components/empty-state";
@@ -38,6 +39,7 @@ export default function DashboardPage() {
   const [userId, setUserId] = useState<string>();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [selectedBookmark, setSelectedBookmark] = useState<BookmarkRow | null>(null);
 
   // Fetch bookmarks with tags
   const fetchBookmarks = useCallback(async () => {
@@ -264,6 +266,7 @@ export default function DashboardPage() {
                 bookmark={bookmark}
                 onDelete={handleDelete}
                 onUpdate={handleUpdate}
+                onClick={() => setSelectedBookmark(bookmark)}
               />
             ))}
           </Masonry>
@@ -278,11 +281,26 @@ export default function DashboardPage() {
                 bookmark={bookmark}
                 onDelete={handleDelete}
                 onUpdate={handleUpdate}
+                onClick={() => setSelectedBookmark(bookmark)}
               />
             ))}
           </div>
         )}
       </div>
+
+      <BookmarkDetailSheet
+        bookmark={selectedBookmark}
+        onClose={() => setSelectedBookmark(null)}
+        onDelete={(id) => {
+          setSelectedBookmark(null);
+          handleDelete(id);
+        }}
+        onUpdate={(updated) => {
+          handleUpdate(updated);
+          // Refetch to get fresh tags
+          fetchBookmarks();
+        }}
+      />
 
       <ToastProvider />
     </div>

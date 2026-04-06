@@ -15,7 +15,7 @@ import { ButtonHTMLAttributes, forwardRef } from "react";
  * Sizes: md (default), lg (wider padding)
  */
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "google";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "google" | "brand";
 export type ButtonSize = "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

@@ -8,6 +8,7 @@ interface BookmarkCardProps {
   bookmark: Bookmark & { bookmark_tags?: { tags: Tag }[] };
   onDelete: (id: string) => void;
   onUpdate: (bookmark: Bookmark) => void;
+  onClick?: () => void;
 }
 
 function formatCompactTime(date: string): string {
@@ -30,7 +31,7 @@ function formatCompactTime(date: string): string {
   return `${dd}/${mm}/${yy}`;
 }
 
-export function BookmarkCard({ bookmark, onDelete }: BookmarkCardProps) {
+export function BookmarkCard({ bookmark, onDelete, onClick }: BookmarkCardProps) {
   const time = formatCompactTime(bookmark.created_at);
 
   function handleDelete(e: React.MouseEvent) {
@@ -50,7 +51,11 @@ export function BookmarkCard({ bookmark, onDelete }: BookmarkCardProps) {
   }
 
   function handleCardClick() {
-    window.open(bookmark.url, "_blank");
+    if (onClick) {
+      onClick();
+    } else {
+      window.open(bookmark.url, "_blank");
+    }
   }
 
   const hasImage = !!bookmark.screenshot_url;

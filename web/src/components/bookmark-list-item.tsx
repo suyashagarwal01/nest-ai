@@ -8,6 +8,7 @@ interface BookmarkListItemProps {
   bookmark: Bookmark & { bookmark_tags?: { tags: Tag }[] };
   onDelete: (id: string) => void;
   onUpdate: (bookmark: Bookmark) => void;
+  onClick?: () => void;
 }
 
 function formatCompactTime(date: string): string {
@@ -33,6 +34,7 @@ function formatCompactTime(date: string): string {
 export function BookmarkListItem({
   bookmark,
   onDelete,
+  onClick,
 }: BookmarkListItemProps) {
   const time = formatCompactTime(bookmark.created_at);
 
@@ -55,7 +57,7 @@ export function BookmarkListItem({
   return (
     <div
       className="bk-list-item"
-      onClick={() => window.open(bookmark.url, "_blank")}
+      onClick={() => onClick ? onClick() : window.open(bookmark.url, "_blank")}
     >
       <div className="flex-1 min-w-0">
         <span className="bk-list-title">
