@@ -3,6 +3,9 @@
 ## What is this?
 A Chrome extension + web dashboard for smart bookmarking. Users save any webpage with one click, get an AI-tagged screenshot card, and access their collection from any device.
 
+## Repository
+https://github.com/suyashagarwal01/nest-ai
+
 ## Product docs
 - PRD: `docs/PRD.md` — full product requirements, user flows, roadmap, and architecture diagrams.
 
@@ -68,7 +71,7 @@ All UI in `web/` MUST follow these rules. No exceptions.
 - **Shadows**: Use `var(--shadow-*)` tokens. Never write raw `box-shadow` values.
 - **No inline styles**: Never use `style={{}}` in components. Create CSS classes in `globals.css` instead.
 - **No Tailwind color classes**: Never use `neutral-*`, `red-*`, `green-*` etc. Use token-based CSS classes.
-- **Buttons**: Use the `<Button>` component from `@/components/ui/button` with variants (`primary`, `secondary`, `ghost`, `google`). Do not create one-off button styles.
+- **Buttons**: Use the `<Button>` component from `@/components/ui/button` with variants (`primary`, `secondary`, `ghost`, `google`, `brand`). Do not create one-off button styles.
 - **Components**: All dashboard components live in `web/src/components/`. Shared primitives (Button, Logo) live in `web/src/components/ui/`.
 - **New tokens**: If a design needs a new color/shadow/radius, add it to `:root` in `globals.css` first, then reference it.
 
